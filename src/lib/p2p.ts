@@ -1,5 +1,5 @@
 
-import Peer from 'peerjs';
+import Peer, { DataConnection } from 'peerjs';
 import { v4 as uuidv4 } from 'uuid';
 
 // Types d'événements P2P
@@ -40,7 +40,7 @@ export interface P2PCallbacks {
 // Classe de gestionnaire P2P pour les parties en ligne
 export class P2PManager {
   private peer: Peer | null = null;
-  private connections: Record<string, Peer.DataConnection> = {};
+  private connections: Record<string, DataConnection> = {};
   private callbacks: P2PCallbacks = {};
   private peerId: string;
   private username: string;
@@ -86,7 +86,7 @@ export class P2PManager {
   }
 
   // Gérer une nouvelle connexion
-  private handleConnection(conn: Peer.DataConnection): void {
+  private handleConnection(conn: DataConnection): void {
     this.connections[conn.peer] = conn;
 
     conn.on('open', () => {

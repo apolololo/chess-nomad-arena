@@ -28,10 +28,10 @@ const GameInfo: React.FC<GameInfoProps> = ({
   const evaluation = evaluatePosition(game);
   
   // Formater l'avantage
-  const formatAdvantage = (eval: number) => {
-    if (eval === 0) return "Égalité";
-    const advantage = Math.abs(eval);
-    const color = eval > 0 ? "Blancs" : "Noirs";
+  const formatAdvantage = (evalScore: number) => {
+    if (evalScore === 0) return "Égalité";
+    const advantage = Math.abs(evalScore);
+    const color = evalScore > 0 ? "Blancs" : "Noirs";
     return `${color} +${advantage}`;
   };
 
