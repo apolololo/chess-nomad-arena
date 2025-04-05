@@ -1,4 +1,3 @@
-
 import { Chess, Square } from 'chess.js';
 import { AIDifficulty, ChessGame, evaluatePosition } from './chess-utils';
 

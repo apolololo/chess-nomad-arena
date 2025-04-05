@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
 import ChessPiece from './ChessPiece';
 import { ChessSquare, ChessGame, getLegalMoves, convertChessPosition } from '@/lib/chess-utils';
-import { playSound, playSoundForMove } from '@/lib/audio';
+import { playSound, playSoundForMove, preloadSounds } from '@/lib/audio';
 
 type ChessboardProps = {
   game: ChessGame;
@@ -26,6 +26,11 @@ const Chessboard: React.FC<ChessboardProps> = ({
   const [draggedPiece, setDraggedPiece] = useState<{ square: ChessSquare, position: { x: number, y: number } } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const touchMoveRef = useRef<boolean>(false);
+  
+  // Précharger les sons au montage du composant
+  useEffect(() => {
+    preloadSounds();
+  }, []);
 
   // Mettre à jour le dernier coup joué
   useEffect(() => {
@@ -46,7 +51,10 @@ const Chessboard: React.FC<ChessboardProps> = ({
     if (disabled) return;
     
     const piece = game.get(square);
-    if (!piece || piece.color !== game.turn()) return;
+    if (!piece || piece.color !== game.turn()) {
+      playSound('illegal');
+      return;
+    }
     
     // Calculer la position initiale
     const boardRect = boardRef.current?.getBoundingClientRect();
@@ -62,6 +70,9 @@ const Chessboard: React.FC<ChessboardProps> = ({
       position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
     });
     
+    // Jouer un son de sélection
+    playSound('move');
+    
     // Définir les mouvements légaux pour cette pièce
     setLegalMoves(getLegalMoves(game, square));
     
@@ -75,7 +86,10 @@ const Chessboard: React.FC<ChessboardProps> = ({
     if (disabled) return;
     
     const piece = game.get(square);
-    if (!piece || piece.color !== game.turn()) return;
+    if (!piece || piece.color !== game.turn()) {
+      playSound('illegal');
+      return;
+    }
     
     touchMoveRef.current = false;
     
@@ -93,6 +107,9 @@ const Chessboard: React.FC<ChessboardProps> = ({
       square,
       position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
     });
+    
+    // Jouer un son de sélection
+    playSound('move');
     
     // Définir les mouvements légaux pour cette pièce
     setLegalMoves(getLegalMoves(game, square));
@@ -328,19 +345,25 @@ const Chessboard: React.FC<ChessboardProps> = ({
         squares.push(
           <div
             key={square}
-            className={`chess-square ${isLightSquare ? 'bg-chess-light-square' : 'bg-chess-dark-square'}`}
+            className={`chess-square relative ${isLightSquare ? 'bg-chess-light-square' : 'bg-chess-dark-square'}`}
             onClick={() => handleSquareClick(square)}
           >
             {/* Coordonnées */}
             {(fileIndex === 0 || fileIndex === 7) && (rankIndex === 0 || rankIndex === 7) && (
-              <div className={`absolute text-xs ${isLightSquare ? 'text-chess-dark-square' : 'text-chess-light-square'} opacity-70 pointer-events-none
+              <div className={`absolute text-xs ${isLightSquare ? 'text-chess-dark-square' : 'text-chess-light-square'} font-semibold opacity-70 pointer-events-none
                 ${fileIndex === 0 ? 'bottom-0.5 left-0.5' : 'bottom-0.5 right-0.5'}`}>
                 {fileIndex === 0 ? rank : file}
               </div>
             )}
             
-            {(isLastMoveFrom || isLastMoveTo) && highlightLastMove && <div className="last-move" />}
-            {isSelected && <div className="square-highlight" />}
+            {(isLastMoveFrom || isLastMoveTo) && highlightLastMove && (
+              <div className="absolute inset-0 bg-blue-400 bg-opacity-30 z-10" />
+            )}
+            
+            {isSelected && (
+              <div className="absolute inset-0 bg-yellow-400 bg-opacity-40 z-10" />
+            )}
+            
             {piece && !isDragOrigin && (
               <ChessPiece
                 type={`${piece.color}${piece.type.toUpperCase()}`}
@@ -350,8 +373,14 @@ const Chessboard: React.FC<ChessboardProps> = ({
                 onTouchStart={(e) => handleTouchStart(e, square)}
               />
             )}
-            {isLegalMove && !piece && <div className="legal-move-marker" />}
-            {isLegalMove && piece && <div className="square-highlight" />}
+            
+            {isLegalMove && !piece && (
+              <div className="absolute w-1/4 h-1/4 rounded-full bg-black bg-opacity-20 z-10 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+            )}
+            
+            {isLegalMove && piece && (
+              <div className="absolute inset-0 border-2 border-yellow-400 z-10" />
+            )}
           </div>
         );
       }
@@ -360,7 +389,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
   };
 
   return (
-    <div className="relative border border-gray-800 rounded shadow-lg touch-none" ref={boardRef}>
+    <div className="relative rounded-lg shadow-lg overflow-hidden touch-none" ref={boardRef}>
       <div className="chessboard">
         {renderBoard()}
       </div>
@@ -372,7 +401,6 @@ const Chessboard: React.FC<ChessboardProps> = ({
           style={{
             left: `${draggedPiece.position.x}px`,
             top: `${draggedPiece.position.y}px`,
-            transform: 'translate(0, 0)',
             width: `${boardRef.current.offsetWidth / 8}px`,
             height: `${boardRef.current.offsetHeight / 8}px`,
           }}

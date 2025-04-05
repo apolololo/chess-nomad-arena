@@ -1,6 +1,7 @@
 
 // Gestionnaire de sons pour le jeu d'échecs
 const audioCache: Record<string, HTMLAudioElement> = {};
+let soundsEnabled = true;
 
 // Types de sons d'échecs
 export type ChessSoundType = 
@@ -27,9 +28,15 @@ const soundPaths: Record<ChessSoundType, string> = {
   notify: '/sounds/notify.mp3'
 };
 
+// Activer/désactiver les sons
+export const toggleSounds = (enabled: boolean): void => {
+  soundsEnabled = enabled;
+};
+
 // Précharger les sons
 export const preloadSounds = (): void => {
   try {
+    console.log("Préchargement des sons...");
     Object.entries(soundPaths).forEach(([key, path]) => {
       const audio = new Audio();
       audio.preload = 'auto';
@@ -54,9 +61,14 @@ export const preloadSounds = (): void => {
 
 // Jouer un son
 export const playSound = (type: ChessSoundType): void => {
+  if (!soundsEnabled) return;
+  
   try {
+    console.log(`Jouer le son: ${type}`);
+    
     // Si le son n'est pas encore en cache, le créer
     if (!audioCache[type]) {
+      console.log(`Création du son: ${type}`);
       const audio = new Audio();
       audio.src = soundPaths[type];
       audioCache[type] = audio;
