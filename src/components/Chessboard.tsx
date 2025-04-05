@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
 import ChessPiece from './ChessPiece';
 import { ChessSquare, ChessGame, getLegalMoves, convertChessPosition } from '@/lib/chess-utils';
+import { playSound, playSoundForMove } from '@/lib/audio';
 
 type ChessboardProps = {
   game: ChessGame;
@@ -22,6 +23,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
   const [selectedSquare, setSelectedSquare] = useState<ChessSquare | null>(null);
   const [legalMoves, setLegalMoves] = useState<ChessSquare[]>([]);
   const [lastMove, setLastMove] = useState<{ from: ChessSquare; to: ChessSquare } | null>(null);
+  const [draggedPiece, setDraggedPiece] = useState<{ square: ChessSquare, position: { x: number, y: number } } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Mettre à jour le dernier coup joué
@@ -38,9 +40,105 @@ const Chessboard: React.FC<ChessboardProps> = ({
     }
   }, [game]);
 
-  // Gérer la sélection d'une case
-  const handleSquareClick = (square: ChessSquare) => {
+  // Gérer le début du glisser-déposer
+  const handleDragStart = (e: React.MouseEvent, square: ChessSquare) => {
     if (disabled) return;
+    
+    const piece = game.get(square);
+    if (!piece || piece.color !== game.turn()) return;
+    
+    // Calculer la position initiale
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+    
+    const squareSize = boardRect.width / 8;
+    const offsetX = e.clientX - boardRect.left;
+    const offsetY = e.clientY - boardRect.top;
+    
+    // Démarrer le glissement
+    setDraggedPiece({
+      square,
+      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
+    });
+    
+    // Définir les mouvements légaux pour cette pièce
+    setLegalMoves(getLegalMoves(game, square));
+    
+    // Ajouter les gestionnaires d'événements
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+  };
+  
+  // Gérer le mouvement pendant le glisser-déposer
+  const handleDragMove = (e: MouseEvent) => {
+    if (!draggedPiece || !boardRef.current) return;
+    
+    const boardRect = boardRef.current.getBoundingClientRect();
+    const offsetX = e.clientX - boardRect.left;
+    const offsetY = e.clientY - boardRect.top;
+    const squareSize = boardRect.width / 8;
+    
+    setDraggedPiece({
+      ...draggedPiece,
+      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
+    });
+  };
+  
+  // Gérer la fin du glisser-déposer
+  const handleDragEnd = (e: MouseEvent) => {
+    document.removeEventListener('mousemove', handleDragMove);
+    document.removeEventListener('mouseup', handleDragEnd);
+    
+    if (!draggedPiece || !boardRef.current) {
+      setDraggedPiece(null);
+      setLegalMoves([]);
+      return;
+    }
+    
+    // Déterminer la case de destination
+    const boardRect = boardRef.current.getBoundingClientRect();
+    const squareSize = boardRect.width / 8;
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
+    
+    // Ajuster pour l'échiquier inversé
+    const displayFiles = isFlipped ? [...files].reverse() : files;
+    const displayRanks = isFlipped ? [...ranks].reverse() : ranks;
+    
+    const x = e.clientX - boardRect.left;
+    const y = e.clientY - boardRect.top;
+    
+    // Vérifier si le relâchement est hors de l'échiquier
+    if (x < 0 || x >= boardRect.width || y < 0 || y >= boardRect.height) {
+      setDraggedPiece(null);
+      setLegalMoves([]);
+      return;
+    }
+    
+    const fileIndex = Math.floor(x / squareSize);
+    const rankIndex = Math.floor(y / squareSize);
+    
+    if (fileIndex >= 0 && fileIndex < 8 && rankIndex >= 0 && rankIndex < 8) {
+      const toSquare = `${displayFiles[fileIndex]}${displayRanks[rankIndex]}` as ChessSquare;
+      
+      // Si le coup est légal, le jouer
+      if (legalMoves.includes(toSquare)) {
+        if (onMove) {
+          onMove({ from: draggedPiece.square, to: toSquare });
+        }
+      } else {
+        // Jouer un son d'erreur pour un mouvement illégal
+        playSound('illegal');
+      }
+    }
+    
+    setDraggedPiece(null);
+    setLegalMoves([]);
+  };
+
+  // Gérer la sélection d'une case (clic)
+  const handleSquareClick = (square: ChessSquare) => {
+    if (disabled || draggedPiece) return;
     
     // Si aucune pièce n'est sélectionnée et qu'il y a une pièce sur la case
     if (!selectedSquare) {
@@ -99,6 +197,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
         const isLegalMove = legalMoves.includes(square);
         const isLastMoveFrom = lastMove && lastMove.from === square;
         const isLastMoveTo = lastMove && lastMove.to === square;
+        const isDragOrigin = draggedPiece && draggedPiece.square === square;
 
         squares.push(
           <div
@@ -108,11 +207,12 @@ const Chessboard: React.FC<ChessboardProps> = ({
           >
             {(isLastMoveFrom || isLastMoveTo) && highlightLastMove && <div className="last-move" />}
             {isSelected && <div className="square-highlight" />}
-            {piece && (
+            {piece && !isDragOrigin && (
               <ChessPiece
                 type={`${piece.color}${piece.type.toUpperCase()}`}
                 position={square}
                 isFlipped={isFlipped}
+                onMouseDown={(e) => handleDragStart(e, square)}
               />
             )}
             {isLegalMove && !piece && <div className="legal-move-marker" />}
@@ -129,6 +229,27 @@ const Chessboard: React.FC<ChessboardProps> = ({
       <div className="chessboard">
         {renderBoard()}
       </div>
+      
+      {/* Pièce en cours de déplacement */}
+      {draggedPiece && boardRef.current && (
+        <div 
+          className="absolute pointer-events-none z-50"
+          style={{
+            left: `${draggedPiece.position.x}px`,
+            top: `${draggedPiece.position.y}px`,
+            transform: 'translate(0, 0)',
+            width: `${boardRef.current.offsetWidth / 8}px`,
+            height: `${boardRef.current.offsetHeight / 8}px`,
+          }}
+        >
+          <ChessPiece
+            type={`${game.get(draggedPiece.square)?.color}${game.get(draggedPiece.square)?.type.toUpperCase()}`}
+            position={draggedPiece.square}
+            isDragging
+            isFlipped={isFlipped}
+          />
+        </div>
+      )}
     </div>
   );
 };

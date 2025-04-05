@@ -41,12 +41,13 @@ const ChessPiece: React.FC<ChessPieceProps> = ({
     <img
       src={getPieceImage()}
       alt={`${color === 'w' ? 'White' : 'Black'} ${getPieceName(piece)}`}
-      className={`chess-piece ${isDragging ? 'opacity-50' : ''}`}
+      className={`chess-piece ${isDragging ? 'opacity-70' : ''} transition-transform cursor-grab`}
       onMouseDown={onMouseDown}
       draggable={false}
       style={{
         transform: isDragging ? 'scale(1.1)' : 'scale(1)',
-        transition: 'transform 0.1s'
+        transition: isDragging ? 'none' : 'transform 0.1s',
+        filter: isDragging ? 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' : 'none'
       }}
     />
   );

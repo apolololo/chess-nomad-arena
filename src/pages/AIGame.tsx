@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Chess, Move } from 'chess.js';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -11,10 +10,11 @@ import {
   AIDifficulty, 
   ChessGame, 
   ChessSquare, 
-  ChessColor, 
-  generateAIMove
+  ChessColor
 } from '@/lib/chess-utils';
+import { generateAIMove } from '@/lib/chess-ai';
 import { useToast } from "@/hooks/use-toast";
+import { playSound, playSoundForMove, preloadSounds } from "@/lib/audio";
 
 const AIGame = () => {
   const { username, rating, updateRating } = useUser();
@@ -22,7 +22,6 @@ const AIGame = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Récupérer les paramètres du jeu
   const { settings } = location.state || {
     settings: {
       aiDifficulty: AIDifficulty.MEDIUM,
@@ -32,7 +31,6 @@ const AIGame = () => {
     }
   };
 
-  // Initialiser le jeu
   const [game, setGame] = useState<ChessGame>(new Chess());
   const [isFlipped, setIsFlipped] = useState(
     settings.startWithFlippedBoard || 
@@ -47,7 +45,10 @@ const AIGame = () => {
   
   const aiName = `IA ${settings.aiDifficulty}`;
   
-  // Si l'IA joue les blancs, faire le premier coup
+  useEffect(() => {
+    preloadSounds();
+  }, []);
+  
   useEffect(() => {
     if (playerColor === 'b' && game.turn() === 'w') {
       setTimeout(() => {
@@ -59,11 +60,13 @@ const AIGame = () => {
     }
   }, []);
   
-  // Vérifier si c'est le tour de l'IA après chaque coup du joueur
   useEffect(() => {
     if (!isGameOver && game.turn() !== playerColor) {
-      // Délai pour simuler la réflexion de l'IA
-      const delay = Math.random() * 700 + 300; // Entre 300 et 1000ms
+      const delay = 
+        settings.aiDifficulty === AIDifficulty.EASY ? 300 :
+        settings.aiDifficulty === AIDifficulty.MEDIUM ? 800 :
+        settings.aiDifficulty === AIDifficulty.HARD ? 1200 :
+        1800; // Expert
       
       setTimeout(() => {
         const aiMove = generateAIMove(game, settings.aiDifficulty!);
@@ -74,7 +77,6 @@ const AIGame = () => {
     }
   }, [game.turn(), isGameOver]);
   
-  // Vérifier si le jeu est terminé
   useEffect(() => {
     if (game.isGameOver()) {
       setIsGameOver(true);
@@ -99,7 +101,6 @@ const AIGame = () => {
         });
       }
       
-      // Mise à jour du classement (simple simulation)
       if (result === 'win') {
         updateRating(rating + 10);
       } else if (result === 'loss') {
@@ -108,43 +109,58 @@ const AIGame = () => {
     }
   }, [game]);
   
-  // Jouer un coup
   const makeMove = (moveNotation: string) => {
     try {
       const newGame = new Chess(game.fen());
-      newGame.move(moveNotation);
-      setGame(newGame);
+      const move = newGame.move(moveNotation);
+      
+      if (move) {
+        const isCheck = newGame.inCheck();
+        const isCheckmate = newGame.isCheckmate();
+        
+        playSoundForMove(move, isCheck, isCheckmate);
+        
+        setGame(newGame);
+      }
     } catch (error) {
       console.error("Coup invalide :", error);
+      playSound('illegal');
     }
   };
   
-  // Gestion du coup du joueur
   const handleMove = ({ from, to }: { from: ChessSquare; to: ChessSquare }) => {
     if (game.turn() !== playerColor || isGameOver) return;
     
     try {
       const move: Move = { from, to } as unknown as Move;
       
-      // Vérifier si c'est une promotion
       const piece = game.get(from);
       const targetRank = to.charAt(1);
       if (piece && piece.type === 'p' && 
           ((piece.color === 'w' && targetRank === '8') || 
            (piece.color === 'b' && targetRank === '1'))) {
-        // Toujours promouvoir en dame pour simplifier
         move.promotion = 'q';
       }
       
       const newGame = new Chess(game.fen());
-      newGame.move(move);
-      setGame(newGame);
+      const result = newGame.move(move);
+      
+      if (result) {
+        const isCheck = newGame.inCheck();
+        const isCheckmate = newGame.isCheckmate();
+        
+        playSoundForMove(result, isCheck, isCheckmate);
+        
+        setGame(newGame);
+      } else {
+        playSound('illegal');
+      }
     } catch (error) {
       console.error("Coup invalide :", error);
+      playSound('illegal');
     }
   };
   
-  // Temps écoulé
   const handleTimeout = (color: ChessColor) => {
     setIsGameOver(true);
     toast({
@@ -152,7 +168,6 @@ const AIGame = () => {
       description: `Temps écoulé pour les ${color === 'w' ? 'blancs' : 'noirs'} !`,
     });
     
-    // Mise à jour du classement
     if (color === playerColor) {
       updateRating(Math.max(0, rating - 5));
     } else {
@@ -160,24 +175,20 @@ const AIGame = () => {
     }
   };
   
-  // Retour au menu
   const handleBackToMenu = () => {
     navigate('/');
   };
   
-  // Nouvelle partie
   const handleNewGame = () => {
     setGame(new Chess());
     setIsGameOver(false);
     
-    // Changer la couleur si randomisée
     if (settings.playerColor === 'random') {
       const newColor = Math.random() < 0.5 ? 'w' : 'b';
       setPlayerColor(newColor);
       setIsFlipped(settings.startWithFlippedBoard || newColor === 'b');
     }
     
-    // Si l'IA joue les blancs, faire le premier coup
     if (playerColor === 'b') {
       setTimeout(() => {
         const aiMove = generateAIMove(game, settings.aiDifficulty!);
@@ -192,7 +203,6 @@ const AIGame = () => {
     <div className="min-h-screen bg-chess-dark text-white p-4">
       <div className="container mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Colonne de gauche (infos) - visible sur desktop */}
           <div className="hidden md:block">
             <h1 className="text-2xl font-bold mb-4">Partie contre {aiName}</h1>
             <GameInfo 
@@ -204,10 +214,8 @@ const AIGame = () => {
             />
           </div>
           
-          {/* Colonne centrale (échiquier) */}
           <div className="md:col-span-2">
             <div className="flex flex-col gap-4">
-              {/* Timer mobile */}
               <GameTimer 
                 initialTimeInSeconds={settings.timeControl.minutes * 60}
                 increment={settings.timeControl.increment}
@@ -216,7 +224,6 @@ const AIGame = () => {
                 onTimeout={handleTimeout}
               />
               
-              {/* Échiquier */}
               <div className="aspect-square">
                 <Chessboard 
                   game={game} 
@@ -226,7 +233,6 @@ const AIGame = () => {
                 />
               </div>
               
-              {/* Contrôles */}
               <div className="flex justify-center mt-4">
                 <GameControls 
                   onFlipBoard={() => setIsFlipped(!isFlipped)}
@@ -243,7 +249,6 @@ const AIGame = () => {
                 />
               </div>
               
-              {/* Infos mobile */}
               <div className="block md:hidden mt-4">
                 <GameInfo 
                   game={game}
