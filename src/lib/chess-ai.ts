@@ -1,5 +1,5 @@
 
-import { Chess } from 'chess.js';
+import { Chess, Square } from 'chess.js';
 import { AIDifficulty, ChessGame, evaluatePosition } from './chess-utils';
 
 // Valeurs des pièces pour l'évaluation
@@ -204,8 +204,8 @@ const isKingExposed = (game: ChessGame, kingSquare: string): boolean => {
   const centralExposure = (file > 1 && file < 6) && (rank > 1 && rank < 6);
   
   // Vérifier si le roi est attaqué
-  const kingColor = game.get(kingSquare)?.color;
-  const isAttacked = kingColor && game.isAttacked(kingSquare, kingColor === 'w' ? 'b' : 'w');
+  const kingColor = game.get(kingSquare as Square)?.color;
+  const isAttacked = kingColor && game.isAttacked(kingSquare as Square, kingColor === 'w' ? 'b' : 'w');
   
   return centralExposure || isAttacked;
 };
