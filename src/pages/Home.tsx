@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Gamepad2, User, Users, ChevronsDown } from "lucide-react";
@@ -56,7 +55,6 @@ const Home = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* En-tête */}
       <header className="bg-chess-dark p-4 text-white">
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-2xl md:text-3xl font-bold text-chess-blue">Chess Nomad Arena</h1>
@@ -69,7 +67,6 @@ const Home = () => {
         </div>
       </header>
 
-      {/* Contenu principal */}
       <main className="flex-grow container mx-auto p-4 flex flex-col items-center justify-center">
         <div className="max-w-2xl w-full text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-8 text-white">Bienvenue sur Chess Nomad Arena</h2>
@@ -116,7 +113,6 @@ const Home = () => {
         </div>
       </main>
       
-      {/* Footer */}
       <footer className="bg-chess-dark border-t border-gray-800 p-4 text-gray-400">
         <div className="container mx-auto text-center">
           <p className="text-sm">
@@ -125,7 +121,6 @@ const Home = () => {
         </div>
       </footer>
       
-      {/* Dialogue de configuration de la partie */}
       <GameSetupDialog 
         open={isGameSetupOpen} 
         onClose={() => setIsGameSetupOpen(false)}
