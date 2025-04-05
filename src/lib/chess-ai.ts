@@ -1,3 +1,4 @@
+
 import { Chess, Square } from 'chess.js';
 import { AIDifficulty, ChessGame, evaluatePosition } from './chess-utils';
 
@@ -148,7 +149,7 @@ const evaluatePositionAdvanced = (game: ChessGame): number => {
         }
         
         // Bonus pour les pièces protégées
-        if (game.isAttacked(square, piece.color)) {
+        if (game.isAttacked(square as Square, piece.color)) {
           score += piece.color === 'w' ? 0.5 : -0.5;
         }
       }
