@@ -25,6 +25,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
   const [lastMove, setLastMove] = useState<{ from: ChessSquare; to: ChessSquare } | null>(null);
   const [draggedPiece, setDraggedPiece] = useState<{ square: ChessSquare, position: { x: number, y: number } } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const touchMoveRef = useRef<boolean>(false);
 
   // Mettre à jour le dernier coup joué
   useEffect(() => {
@@ -40,7 +41,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
     }
   }, [game]);
 
-  // Gérer le début du glisser-déposer
+  // Gérer le début du glisser-déposer avec la souris
   const handleDragStart = (e: React.MouseEvent, square: ChessSquare) => {
     if (disabled) return;
     
@@ -68,8 +69,43 @@ const Chessboard: React.FC<ChessboardProps> = ({
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
   };
+
+  // Gérer le début du glisser-déposer avec le toucher
+  const handleTouchStart = (e: React.TouchEvent, square: ChessSquare) => {
+    if (disabled) return;
+    
+    const piece = game.get(square);
+    if (!piece || piece.color !== game.turn()) return;
+    
+    touchMoveRef.current = false;
+    
+    // Calculer la position initiale
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+    
+    const touch = e.touches[0];
+    const squareSize = boardRect.width / 8;
+    const offsetX = touch.clientX - boardRect.left;
+    const offsetY = touch.clientY - boardRect.top;
+    
+    // Démarrer le glissement
+    setDraggedPiece({
+      square,
+      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
+    });
+    
+    // Définir les mouvements légaux pour cette pièce
+    setLegalMoves(getLegalMoves(game, square));
+    
+    // Ajouter les gestionnaires d'événements
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+    
+    // Empêcher le scroll et autres comportements par défaut
+    e.preventDefault();
+  };
   
-  // Gérer le mouvement pendant le glisser-déposer
+  // Gérer le mouvement pendant le glisser-déposer avec la souris
   const handleDragMove = (e: MouseEvent) => {
     if (!draggedPiece || !boardRef.current) return;
     
@@ -84,7 +120,28 @@ const Chessboard: React.FC<ChessboardProps> = ({
     });
   };
   
-  // Gérer la fin du glisser-déposer
+  // Gérer le mouvement pendant le glisser-déposer avec le toucher
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!draggedPiece || !boardRef.current) return;
+    
+    touchMoveRef.current = true;
+    
+    const boardRect = boardRef.current.getBoundingClientRect();
+    const touch = e.touches[0];
+    const offsetX = touch.clientX - boardRect.left;
+    const offsetY = touch.clientY - boardRect.top;
+    const squareSize = boardRect.width / 8;
+    
+    setDraggedPiece({
+      ...draggedPiece,
+      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
+    });
+    
+    // Empêcher le scroll et autres comportements par défaut
+    e.preventDefault();
+  };
+  
+  // Gérer la fin du glisser-déposer avec la souris
   const handleDragEnd = (e: MouseEvent) => {
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
@@ -135,6 +192,69 @@ const Chessboard: React.FC<ChessboardProps> = ({
     setDraggedPiece(null);
     setLegalMoves([]);
   };
+  
+  // Gérer la fin du glisser-déposer avec le toucher
+  const handleTouchEnd = (e: TouchEvent) => {
+    document.removeEventListener('touchmove', handleTouchMove);
+    document.removeEventListener('touchend', handleTouchEnd);
+    
+    // Si c'était juste un tap (pas un mouvement), traiter comme un clic
+    if (!touchMoveRef.current) {
+      if (draggedPiece) {
+        handleSquareClick(draggedPiece.square);
+      }
+      setDraggedPiece(null);
+      setLegalMoves([]);
+      return;
+    }
+    
+    if (!draggedPiece || !boardRef.current) {
+      setDraggedPiece(null);
+      setLegalMoves([]);
+      return;
+    }
+    
+    // Déterminer la case de destination
+    const boardRect = boardRef.current.getBoundingClientRect();
+    const squareSize = boardRect.width / 8;
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
+    
+    // Ajuster pour l'échiquier inversé
+    const displayFiles = isFlipped ? [...files].reverse() : files;
+    const displayRanks = isFlipped ? [...ranks].reverse() : ranks;
+    
+    const touch = e.changedTouches[0];
+    const x = touch.clientX - boardRect.left;
+    const y = touch.clientY - boardRect.top;
+    
+    // Vérifier si le relâchement est hors de l'échiquier
+    if (x < 0 || x >= boardRect.width || y < 0 || y >= boardRect.height) {
+      setDraggedPiece(null);
+      setLegalMoves([]);
+      return;
+    }
+    
+    const fileIndex = Math.floor(x / squareSize);
+    const rankIndex = Math.floor(y / squareSize);
+    
+    if (fileIndex >= 0 && fileIndex < 8 && rankIndex >= 0 && rankIndex < 8) {
+      const toSquare = `${displayFiles[fileIndex]}${displayRanks[rankIndex]}` as ChessSquare;
+      
+      // Si le coup est légal, le jouer
+      if (legalMoves.includes(toSquare)) {
+        if (onMove) {
+          onMove({ from: draggedPiece.square, to: toSquare });
+        }
+      } else {
+        // Jouer un son d'erreur pour un mouvement illégal
+        playSound('illegal');
+      }
+    }
+    
+    setDraggedPiece(null);
+    setLegalMoves([]);
+  };
 
   // Gérer la sélection d'une case (clic)
   const handleSquareClick = (square: ChessSquare) => {
@@ -147,6 +267,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
       if (piece && piece.color === game.turn()) {
         setSelectedSquare(square);
         setLegalMoves(getLegalMoves(game, square));
+        // Jouer un son de sélection
+        playSound('move');
       }
     } 
     // Si une pièce est déjà sélectionnée
@@ -166,10 +288,14 @@ const Chessboard: React.FC<ChessboardProps> = ({
         if (piece && piece.color === game.turn()) {
           setSelectedSquare(square);
           setLegalMoves(getLegalMoves(game, square));
+          // Jouer un son de sélection
+          playSound('move');
         } else {
           // Sinon, annuler la sélection
           setSelectedSquare(null);
           setLegalMoves([]);
+          // Jouer un son de désélection
+          playSound('illegal');
         }
       }
     }
@@ -205,6 +331,14 @@ const Chessboard: React.FC<ChessboardProps> = ({
             className={`chess-square ${isLightSquare ? 'bg-chess-light-square' : 'bg-chess-dark-square'}`}
             onClick={() => handleSquareClick(square)}
           >
+            {/* Coordonnées */}
+            {(fileIndex === 0 || fileIndex === 7) && (rankIndex === 0 || rankIndex === 7) && (
+              <div className={`absolute text-xs ${isLightSquare ? 'text-chess-dark-square' : 'text-chess-light-square'} opacity-70 pointer-events-none
+                ${fileIndex === 0 ? 'bottom-0.5 left-0.5' : 'bottom-0.5 right-0.5'}`}>
+                {fileIndex === 0 ? rank : file}
+              </div>
+            )}
+            
             {(isLastMoveFrom || isLastMoveTo) && highlightLastMove && <div className="last-move" />}
             {isSelected && <div className="square-highlight" />}
             {piece && !isDragOrigin && (
@@ -213,6 +347,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
                 position={square}
                 isFlipped={isFlipped}
                 onMouseDown={(e) => handleDragStart(e, square)}
+                onTouchStart={(e) => handleTouchStart(e, square)}
               />
             )}
             {isLegalMove && !piece && <div className="legal-move-marker" />}
@@ -225,7 +360,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
   };
 
   return (
-    <div className="relative border border-gray-800 rounded shadow-lg" ref={boardRef}>
+    <div className="relative border border-gray-800 rounded shadow-lg touch-none" ref={boardRef}>
       <div className="chessboard">
         {renderBoard()}
       </div>

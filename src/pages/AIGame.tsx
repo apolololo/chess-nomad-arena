@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Chess, Move } from 'chess.js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Chessboard from '@/components/Chessboard';
@@ -37,6 +38,7 @@ const AIGame = () => {
     settings.playerColor === 'black'
   );
   const [isGameOver, setIsGameOver] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [playerColor, setPlayerColor] = useState<ChessColor>(
     settings.playerColor === 'random' 
       ? Math.random() < 0.5 ? 'w' : 'b'
@@ -49,33 +51,46 @@ const AIGame = () => {
     preloadSounds();
   }, []);
   
-  useEffect(() => {
-    if (playerColor === 'b' && game.turn() === 'w') {
-      setTimeout(() => {
+  const makeAIMove = useCallback(() => {
+    setIsThinking(true);
+    
+    // Délai variable selon la difficulté pour simuler la "réflexion"
+    const delay = 
+      settings.aiDifficulty === AIDifficulty.EASY ? 300 :
+      settings.aiDifficulty === AIDifficulty.MEDIUM ? 800 :
+      settings.aiDifficulty === AIDifficulty.HARD ? 1200 :
+      1800; // Expert
+    
+    setTimeout(() => {
+      try {
         const aiMove = generateAIMove(game, settings.aiDifficulty!);
         if (aiMove) {
           makeMove(aiMove);
         }
-      }, 500);
+        setIsThinking(false);
+      } catch (error) {
+        console.error("Erreur lors du coup de l'IA:", error);
+        setIsThinking(false);
+        toast({
+          title: "Erreur de l'IA",
+          description: "Une erreur est survenue lors du calcul du coup de l'IA.",
+          variant: "destructive"
+        });
+      }
+    }, delay);
+  }, [game, settings.aiDifficulty, toast]);
+  
+  useEffect(() => {
+    if (playerColor === 'b' && game.turn() === 'w' && !isGameOver) {
+      makeAIMove();
     }
   }, []);
   
   useEffect(() => {
-    if (!isGameOver && game.turn() !== playerColor) {
-      const delay = 
-        settings.aiDifficulty === AIDifficulty.EASY ? 300 :
-        settings.aiDifficulty === AIDifficulty.MEDIUM ? 800 :
-        settings.aiDifficulty === AIDifficulty.HARD ? 1200 :
-        1800; // Expert
-      
-      setTimeout(() => {
-        const aiMove = generateAIMove(game, settings.aiDifficulty!);
-        if (aiMove) {
-          makeMove(aiMove);
-        }
-      }, delay);
+    if (!isGameOver && game.turn() !== playerColor && !isThinking) {
+      makeAIMove();
     }
-  }, [game.turn(), isGameOver]);
+  }, [game.turn(), isGameOver, isThinking, makeAIMove, playerColor]);
   
   useEffect(() => {
     if (game.isGameOver()) {
@@ -91,6 +106,7 @@ const AIGame = () => {
         });
       } else if (game.isDraw()) {
         result = 'draw';
+        playSound('draw');
         toast({
           title: "Partie nulle",
           description: game.isStalemate() 
@@ -107,7 +123,7 @@ const AIGame = () => {
         updateRating(Math.max(0, rating - 5));
       }
     }
-  }, [game]);
+  }, [game, playerColor, rating, toast, updateRating]);
   
   const makeMove = (moveNotation: string) => {
     try {
@@ -129,7 +145,7 @@ const AIGame = () => {
   };
   
   const handleMove = ({ from, to }: { from: ChessSquare; to: ChessSquare }) => {
-    if (game.turn() !== playerColor || isGameOver) return;
+    if (game.turn() !== playerColor || isGameOver || isThinking) return;
     
     try {
       const move: Move = { from, to } as unknown as Move;
@@ -182,6 +198,7 @@ const AIGame = () => {
   const handleNewGame = () => {
     setGame(new Chess());
     setIsGameOver(false);
+    setIsThinking(false);
     
     if (settings.playerColor === 'random') {
       const newColor = Math.random() < 0.5 ? 'w' : 'b';
@@ -189,12 +206,10 @@ const AIGame = () => {
       setIsFlipped(settings.startWithFlippedBoard || newColor === 'b');
     }
     
+    // Si le joueur est noir, l'IA (blancs) doit jouer en premier
     if (playerColor === 'b') {
       setTimeout(() => {
-        const aiMove = generateAIMove(game, settings.aiDifficulty!);
-        if (aiMove) {
-          makeMove(aiMove);
-        }
+        makeAIMove();
       }, 500);
     }
   };
@@ -229,9 +244,15 @@ const AIGame = () => {
                   game={game} 
                   onMove={handleMove} 
                   isFlipped={isFlipped}
-                  disabled={isGameOver || game.turn() !== playerColor}
+                  disabled={isGameOver || game.turn() !== playerColor || isThinking}
                 />
               </div>
+              
+              {isThinking && game.turn() !== playerColor && !isGameOver && (
+                <div className="text-center text-sm text-chess-blue animate-pulse">
+                  L'IA réfléchit...
+                </div>
+              )}
               
               <div className="flex justify-center mt-4">
                 <GameControls 

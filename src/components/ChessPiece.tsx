@@ -6,6 +6,7 @@ type ChessPieceProps = {
   position: string;
   isDragging?: boolean;
   onMouseDown?: (e: React.MouseEvent) => void;
+  onTouchStart?: (e: React.TouchEvent) => void;
   isFlipped?: boolean;
 };
 
@@ -14,6 +15,7 @@ const ChessPiece: React.FC<ChessPieceProps> = ({
   position, 
   isDragging = false, 
   onMouseDown,
+  onTouchStart,
   isFlipped = false 
 }) => {
   // Le type sera comme 'wP' pour un pion blanc ou 'bQ' pour une reine noire
@@ -41,13 +43,15 @@ const ChessPiece: React.FC<ChessPieceProps> = ({
     <img
       src={getPieceImage()}
       alt={`${color === 'w' ? 'White' : 'Black'} ${getPieceName(piece)}`}
-      className={`chess-piece ${isDragging ? 'opacity-70' : ''} transition-transform cursor-grab`}
+      className={`chess-piece ${isDragging ? 'opacity-80' : ''} transition-transform cursor-grab will-change-transform`}
       onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
       draggable={false}
       style={{
         transform: isDragging ? 'scale(1.1)' : 'scale(1)',
-        transition: isDragging ? 'none' : 'transform 0.1s',
-        filter: isDragging ? 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' : 'none'
+        transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+        filter: isDragging ? 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' : 'none',
+        touchAction: 'none'
       }}
     />
   );

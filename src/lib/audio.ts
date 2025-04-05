@@ -29,27 +29,59 @@ const soundPaths: Record<ChessSoundType, string> = {
 
 // Précharger les sons
 export const preloadSounds = (): void => {
-  Object.entries(soundPaths).forEach(([key, path]) => {
-    const audio = new Audio(path);
-    audio.preload = 'auto';
-    audioCache[key] = audio;
-  });
+  try {
+    Object.entries(soundPaths).forEach(([key, path]) => {
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audio.src = path;
+      
+      // Forcer le préchargement
+      audio.addEventListener('canplaythrough', () => {
+        console.log(`Son préchargé: ${key}`);
+      }, { once: true });
+      
+      // Gérer les erreurs de chargement
+      audio.addEventListener('error', (e) => {
+        console.error(`Erreur lors du chargement du son ${key}:`, e);
+      });
+      
+      audioCache[key] = audio;
+    });
+  } catch (err) {
+    console.error("Erreur lors du préchargement des sons:", err);
+  }
 };
 
 // Jouer un son
 export const playSound = (type: ChessSoundType): void => {
-  // Si le son n'est pas encore en cache, le créer
-  if (!audioCache[type]) {
-    const audio = new Audio(soundPaths[type]);
-    audioCache[type] = audio;
+  try {
+    // Si le son n'est pas encore en cache, le créer
+    if (!audioCache[type]) {
+      const audio = new Audio();
+      audio.src = soundPaths[type];
+      audioCache[type] = audio;
+    }
+    
+    // Réinitialiser et jouer le son
+    const sound = audioCache[type];
+    sound.currentTime = 0;
+    sound.volume = 0.7; // Réduire légèrement le volume
+    
+    // Assurer que le son est chargé avant de le jouer
+    if (sound.readyState >= 2) {
+      sound.play().catch(err => {
+        console.warn(`Impossible de jouer le son ${type}:`, err);
+      });
+    } else {
+      sound.addEventListener('canplaythrough', () => {
+        sound.play().catch(err => {
+          console.warn(`Impossible de jouer le son ${type} après chargement:`, err);
+        });
+      }, { once: true });
+    }
+  } catch (err) {
+    console.error(`Erreur lors de la lecture du son ${type}:`, err);
   }
-  
-  // Réinitialiser et jouer le son
-  const sound = audioCache[type];
-  sound.currentTime = 0;
-  sound.play().catch(err => {
-    console.warn(`Impossible de jouer le son ${type}:`, err);
-  });
 };
 
 // Déterminer quel son jouer en fonction de l'action d'échecs

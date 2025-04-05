@@ -1,213 +1,339 @@
 
 import { Chess } from 'chess.js';
-import { AIDifficulty, ChessGame } from './chess-utils';
+import { AIDifficulty, ChessGame, evaluatePosition } from './chess-utils';
 
-// Valeurs des pièces (en centipawns - 100 = valeur d'un pion)
-const PIECE_VALUES = {
-  p: 100,   // Pion
-  n: 320,   // Cavalier
-  b: 330,   // Fou
-  r: 500,   // Tour
-  q: 900,   // Dame
-  k: 20000  // Roi (valeur élevée pour éviter sa capture)
+// Valeurs des pièces pour l'évaluation
+const PIECE_VALUES: Record<string, number> = {
+  p: 10,  // Pion
+  n: 30,  // Cavalier
+  b: 30,  // Fou
+  r: 50,  // Tour
+  q: 90,  // Dame
+  k: 900  // Roi
 };
 
-// Bonus de position pour chaque type de pièce (encourager un bon développement)
-// Pour les blancs - à inverser pour les noirs
-const POSITION_BONUS = {
-  p: [ // Pion
-    [0,  0,  0,  0,  0,  0,  0,  0],
-    [50, 50, 50, 50, 50, 50, 50, 50],
-    [10, 10, 20, 30, 30, 20, 10, 10],
-    [5,  5, 10, 25, 25, 10,  5,  5],
-    [0,  0,  0, 20, 20,  0,  0,  0],
-    [5, -5,-10,  0,  0,-10, -5,  5],
-    [5, 10, 10,-20,-20, 10, 10,  5],
-    [0,  0,  0,  0,  0,  0,  0,  0]
-  ],
-  n: [ // Cavalier
-    [-50,-40,-30,-30,-30,-30,-40,-50],
-    [-40,-20,  0,  0,  0,  0,-20,-40],
-    [-30,  0, 10, 15, 15, 10,  0,-30],
-    [-30,  5, 15, 20, 20, 15,  5,-30],
-    [-30,  0, 15, 20, 20, 15,  0,-30],
-    [-30,  5, 10, 15, 15, 10,  5,-30],
-    [-40,-20,  0,  5,  5,  0,-20,-40],
-    [-50,-40,-30,-30,-30,-30,-40,-50]
-  ],
-  b: [ // Fou
-    [-20,-10,-10,-10,-10,-10,-10,-20],
-    [-10,  0,  0,  0,  0,  0,  0,-10],
-    [-10,  0, 10, 10, 10, 10,  0,-10],
-    [-10,  5,  5, 10, 10,  5,  5,-10],
-    [-10,  0,  5, 10, 10,  5,  0,-10],
-    [-10,  5,  5,  5,  5,  5,  5,-10],
-    [-10,  0,  5,  0,  0,  5,  0,-10],
-    [-20,-10,-10,-10,-10,-10,-10,-20]
-  ],
-  r: [ // Tour
-    [0,  0,  0,  0,  0,  0,  0,  0],
-    [5, 10, 10, 10, 10, 10, 10,  5],
-    [-5,  0,  0,  0,  0,  0,  0, -5],
-    [-5,  0,  0,  0,  0,  0,  0, -5],
-    [-5,  0,  0,  0,  0,  0,  0, -5],
-    [-5,  0,  0,  0,  0,  0,  0, -5],
-    [-5,  0,  0,  0,  0,  0,  0, -5],
-    [0,  0,  0,  5,  5,  0,  0,  0]
-  ],
-  q: [ // Dame
-    [-20,-10,-10, -5, -5,-10,-10,-20],
-    [-10,  0,  0,  0,  0,  0,  0,-10],
-    [-10,  0,  5,  5,  5,  5,  0,-10],
-    [-5,  0,  5,  5,  5,  5,  0, -5],
-    [0,  0,  5,  5,  5,  5,  0, -5],
-    [-10,  5,  5,  5,  5,  5,  0,-10],
-    [-10,  0,  5,  0,  0,  0,  0,-10],
-    [-20,-10,-10, -5, -5,-10,-10,-20]
-  ],
-  k: [ // Roi (milieu de jeu)
-    [-30,-40,-40,-50,-50,-40,-40,-30],
-    [-30,-40,-40,-50,-50,-40,-40,-30],
-    [-30,-40,-40,-50,-50,-40,-40,-30],
-    [-30,-40,-40,-50,-50,-40,-40,-30],
-    [-20,-30,-30,-40,-40,-30,-30,-20],
-    [-10,-20,-20,-20,-20,-20,-20,-10],
-    [20, 20,  0,  0,  0,  0, 20, 20],
-    [20, 30, 10,  0,  0, 10, 30, 20]
-  ]
+// Table de position pour les pions (blanc, perspective des blancs)
+const PAWN_TABLE: number[] = [
+  0,  0,  0,  0,  0,  0,  0,  0,
+  50, 50, 50, 50, 50, 50, 50, 50,
+  10, 10, 20, 30, 30, 20, 10, 10,
+  5,  5, 10, 25, 25, 10,  5,  5,
+  0,  0,  0, 20, 20,  0,  0,  0,
+  5, -5,-10,  0,  0,-10, -5,  5,
+  5, 10, 10,-20,-20, 10, 10,  5,
+  0,  0,  0,  0,  0,  0,  0,  0
+];
+
+// Table de position pour les cavaliers
+const KNIGHT_TABLE: number[] = [
+  -50,-40,-30,-30,-30,-30,-40,-50,
+  -40,-20,  0,  0,  0,  0,-20,-40,
+  -30,  0, 10, 15, 15, 10,  0,-30,
+  -30,  5, 15, 20, 20, 15,  5,-30,
+  -30,  0, 15, 20, 20, 15,  0,-30,
+  -30,  5, 10, 15, 15, 10,  5,-30,
+  -40,-20,  0,  5,  5,  0,-20,-40,
+  -50,-40,-30,-30,-30,-30,-40,-50
+];
+
+// Table de position pour les fous
+const BISHOP_TABLE: number[] = [
+  -20,-10,-10,-10,-10,-10,-10,-20,
+  -10,  0,  0,  0,  0,  0,  0,-10,
+  -10,  0, 10, 10, 10, 10,  0,-10,
+  -10,  5,  5, 10, 10,  5,  5,-10,
+  -10,  0,  5, 10, 10,  5,  0,-10,
+  -10,  5,  5,  5,  5,  5,  5,-10,
+  -10,  0,  5,  0,  0,  5,  0,-10,
+  -20,-10,-10,-10,-10,-10,-10,-20
+];
+
+// Table de position pour les tours
+const ROOK_TABLE: number[] = [
+  0,  0,  0,  0,  0,  0,  0,  0,
+  5, 10, 10, 10, 10, 10, 10,  5,
+  -5,  0,  0,  0,  0,  0,  0, -5,
+  -5,  0,  0,  0,  0,  0,  0, -5,
+  -5,  0,  0,  0,  0,  0,  0, -5,
+  -5,  0,  0,  0,  0,  0,  0, -5,
+  -5,  0,  0,  0,  0,  0,  0, -5,
+  0,  0,  0,  5,  5,  0,  0,  0
+];
+
+// Table de position pour les dames
+const QUEEN_TABLE: number[] = [
+  -20,-10,-10, -5, -5,-10,-10,-20,
+  -10,  0,  0,  0,  0,  0,  0,-10,
+  -10,  0,  5,  5,  5,  5,  0,-10,
+  -5,  0,  5,  5,  5,  5,  0, -5,
+  0,  0,  5,  5,  5,  5,  0, -5,
+  -10,  5,  5,  5,  5,  5,  0,-10,
+  -10,  0,  5,  0,  0,  0,  0,-10,
+  -20,-10,-10, -5, -5,-10,-10,-20
+];
+
+// Table de position pour le roi (milieu de partie)
+const KING_MIDDLE_TABLE: number[] = [
+  -30,-40,-40,-50,-50,-40,-40,-30,
+  -30,-40,-40,-50,-50,-40,-40,-30,
+  -30,-40,-40,-50,-50,-40,-40,-30,
+  -30,-40,-40,-50,-50,-40,-40,-30,
+  -20,-30,-30,-40,-40,-30,-30,-20,
+  -10,-20,-20,-20,-20,-20,-20,-10,
+  20, 20,  0,  0,  0,  0, 20, 20,
+  20, 30, 10,  0,  0, 10, 30, 20
+];
+
+// Obtenir la valeur positionnelle pour une pièce donnée
+const getPositionValue = (piece: string, square: string, isEndgame: boolean): number => {
+  const file = square.charCodeAt(0) - 97; // 'a' -> 0, 'b' -> 1, etc.
+  const rank = 8 - parseInt(square[1]); // '1' -> 7, '2' -> 6, etc.
+  const index = rank * 8 + file;
+  
+  // Inverser l'index pour les pièces noires
+  const color = piece[0];
+  const invertedIndex = color === 'b' ? 63 - index : index;
+  
+  switch (piece[1]) {
+    case 'p': return PAWN_TABLE[invertedIndex];
+    case 'n': return KNIGHT_TABLE[invertedIndex];
+    case 'b': return BISHOP_TABLE[invertedIndex];
+    case 'r': return ROOK_TABLE[invertedIndex];
+    case 'q': return QUEEN_TABLE[invertedIndex];
+    case 'k': return KING_MIDDLE_TABLE[invertedIndex];
+    default: return 0;
+  }
 };
 
-// Évaluation de la position actuelle (en centipawns)
-const evaluatePosition = (game: ChessGame): number => {
-  // Si le jeu est terminé, retourner une valeur extrême
+// Évaluation avancée de la position actuelle
+const evaluatePositionAdvanced = (game: ChessGame): number => {
   if (game.isCheckmate()) {
-    return game.turn() === 'w' ? -10000 : 10000; // Le joueur qui a le trait a perdu
+    // Si c'est échec et mat, c'est une victoire totale
+    return game.turn() === 'w' ? -10000 : 10000;
   }
   
-  if (game.isDraw()) {
-    return 0; // Match nul
+  if (game.isDraw() || game.isStalemate()) {
+    return 0; // Un match nul vaut 0
   }
-
+  
   const board = game.board();
   let score = 0;
-
-  // Calcul du matériel et des bonus de position
+  let material = 0;
+  
+  // On compte d'abord le matériel pour déterminer si on est en fin de partie
   for (let i = 0; i < 8; i++) {
     for (let j = 0; j < 8; j++) {
       const piece = board[i][j];
-      if (!piece) continue;
-      
-      // Valeur de base de la pièce
-      const value = PIECE_VALUES[piece.type];
-      
-      // Ajouter la valeur au score (positif pour blanc, négatif pour noir)
-      if (piece.color === 'w') {
-        score += value;
-        // Ajouter bonus de position pour blanc
-        score += POSITION_BONUS[piece.type][i][j];
-      } else {
-        score -= value;
-        // Ajouter bonus de position pour noir (inversé)
-        score -= POSITION_BONUS[piece.type][7-i][j];
+      if (piece) {
+        const pieceValue = PIECE_VALUES[piece.type];
+        material += pieceValue;
       }
     }
   }
-
-  // Petits bonus supplémentaires
+  
+  const isEndgame = material < 30; // Seuil arbitraire pour la fin de partie
+  
+  // Maintenant on calcule le score précis
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const piece = board[i][j];
+      if (piece) {
+        const square = String.fromCharCode(97 + j) + (8 - i);
+        const pieceValue = PIECE_VALUES[piece.type];
+        const positionValue = getPositionValue(piece.color + piece.type, square, isEndgame);
+        
+        if (piece.color === 'w') {
+          score += pieceValue + positionValue / 10;
+        } else {
+          score -= pieceValue + positionValue / 10;
+        }
+        
+        // Bonus pour les pièces protégées
+        if (game.isAttacked(square, piece.color)) {
+          score += piece.color === 'w' ? 0.5 : -0.5;
+        }
+      }
+    }
+  }
+  
+  // Mobilité (nombre de coups légaux)
   const moves = game.moves();
-  const mobility = moves.length * 2; // Bonus de mobilité
+  const mobility = moves.length / 10;
   score += game.turn() === 'w' ? mobility : -mobility;
   
-  // Bonus pour les échecs
-  if (game.inCheck()) {
-    score += game.turn() === 'w' ? -50 : 50;
+  // Pénalité pour le roi exposé
+  const whiteKingSquare = findKing(game, 'w');
+  const blackKingSquare = findKing(game, 'b');
+  
+  if (whiteKingSquare && isKingExposed(game, whiteKingSquare)) {
+    score -= 5;
   }
-
+  
+  if (blackKingSquare && isKingExposed(game, blackKingSquare)) {
+    score += 5;
+  }
+  
+  // Vérifier les échecs
+  if (game.inCheck()) {
+    score += game.turn() === 'w' ? -2 : 2;
+  }
+  
   return score;
 };
 
-// Minimax avec élagage alpha-beta pour déterminer le meilleur coup
-const minimax = (game: ChessGame, depth: number, alpha: number, beta: number, isMaximizing: boolean): [number, string | null] => {
-  // Cas de base : profondeur 0 ou fin de jeu
-  if (depth === 0 || game.isGameOver()) {
-    return [evaluatePosition(game), null];
+// Trouver la position du roi
+const findKing = (game: ChessGame, color: 'w' | 'b'): string | null => {
+  const board = game.board();
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const piece = board[i][j];
+      if (piece && piece.type === 'k' && piece.color === color) {
+        return String.fromCharCode(97 + j) + (8 - i);
+      }
+    }
   }
+  return null;
+};
 
-  let bestMove: string | null = null;
-  const moves = game.moves();
+// Vérifier si le roi est exposé
+const isKingExposed = (game: ChessGame, kingSquare: string): boolean => {
+  const file = kingSquare.charCodeAt(0) - 97;
+  const rank = 8 - parseInt(kingSquare[1]);
   
-  // Trier les coups pour améliorer l'élagage alpha-beta (captures d'abord)
+  // Vérifier si le roi est au centre (plus exposé)
+  const centralExposure = (file > 1 && file < 6) && (rank > 1 && rank < 6);
+  
+  // Vérifier si le roi est attaqué
+  const kingColor = game.get(kingSquare)?.color;
+  const isAttacked = kingColor && game.isAttacked(kingSquare, kingColor === 'w' ? 'b' : 'w');
+  
+  return centralExposure || isAttacked;
+};
+
+// Algorithme Minimax avec élagage alpha-bêta
+const minimax = (
+  game: ChessGame, 
+  depth: number, 
+  alpha: number, 
+  beta: number, 
+  isMaximizingPlayer: boolean
+): number => {
+  if (depth === 0 || game.isGameOver()) {
+    return evaluatePositionAdvanced(game);
+  }
+  
+  const moves = game.moves({ verbose: true });
+  
+  // Trier les coups pour optimiser l'élagage
   moves.sort((a, b) => {
-    const captureValueA = a.includes('x') ? 10 : 0;
-    const captureValueB = b.includes('x') ? 10 : 0;
+    // Priorité aux captures
+    const captureValueA = a.captured ? PIECE_VALUES[a.captured] : 0;
+    const captureValueB = b.captured ? PIECE_VALUES[b.captured] : 0;
     return captureValueB - captureValueA;
   });
-
-  if (isMaximizing) {
-    let bestScore = -Infinity;
+  
+  if (isMaximizingPlayer) {
+    let maxEval = -Infinity;
     for (const move of moves) {
-      const gameCopy = new Chess(game.fen());
-      gameCopy.move(move);
-      const [score] = minimax(gameCopy, depth - 1, alpha, beta, false);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = move;
-      }
-      alpha = Math.max(alpha, bestScore);
+      game.move(move);
+      const evaluation = minimax(game, depth - 1, alpha, beta, false);
+      game.undo();
+      maxEval = Math.max(maxEval, evaluation);
+      alpha = Math.max(alpha, evaluation);
       if (beta <= alpha) break; // Élagage alpha
     }
-    return [bestScore, bestMove];
+    return maxEval;
   } else {
-    let bestScore = Infinity;
+    let minEval = Infinity;
     for (const move of moves) {
-      const gameCopy = new Chess(game.fen());
-      gameCopy.move(move);
-      const [score] = minimax(gameCopy, depth - 1, alpha, beta, true);
-      if (score < bestScore) {
-        bestScore = score;
-        bestMove = move;
-      }
-      beta = Math.min(beta, bestScore);
-      if (beta <= alpha) break; // Élagage beta
+      game.move(move);
+      const evaluation = minimax(game, depth - 1, alpha, beta, true);
+      game.undo();
+      minEval = Math.min(minEval, evaluation);
+      beta = Math.min(beta, evaluation);
+      if (beta <= alpha) break; // Élagage bêta
     }
-    return [bestScore, bestMove];
+    return minEval;
   }
 };
 
-// Générer un coup en fonction de la difficulté
+// Fonction pour générer un coup d'IA
 export const generateAIMove = (game: ChessGame, difficulty: AIDifficulty): string | null => {
-  const moves = game.moves();
+  const moves = game.moves({ verbose: true });
   if (moves.length === 0) return null;
-
+  
+  let selectedMove;
+  
   switch (difficulty) {
     case AIDifficulty.EASY:
-      // Niveau débutant: profondeur 1 + aléatoire
-      if (Math.random() < 0.5) {
-        // 50% du temps, juste un coup aléatoire
-        return moves[Math.floor(Math.random() * moves.length)];
+      // En mode facile, jouer parfois au hasard, parfois avec un peu de stratégie
+      if (Math.random() < 0.7) {
+        // Coup complètement aléatoire
+        selectedMove = moves[Math.floor(Math.random() * moves.length)];
       } else {
-        // 50% du temps, un coup basique calculé
-        const [_, move] = minimax(game, 1, -Infinity, Infinity, game.turn() === 'w');
-        return move;
+        // Coup un peu stratégique (profondeur 1)
+        selectedMove = findBestMove(game, 1);
       }
-    
+      break;
+      
     case AIDifficulty.MEDIUM:
-      // Niveau intermédiaire: profondeur 2
-      const [_, mediumMove] = minimax(game, 2, -Infinity, Infinity, game.turn() === 'w');
-      return mediumMove;
-    
+      // En mode moyen, mélanger les coups aléatoires et stratégiques
+      if (Math.random() < 0.3) {
+        // Coup aléatoire parmi les captures ou les échecs
+        const goodMoves = moves.filter(move => 
+          move.flags.includes('c') || move.san.includes('+')
+        );
+        
+        selectedMove = goodMoves.length > 0 
+          ? goodMoves[Math.floor(Math.random() * goodMoves.length)]
+          : moves[Math.floor(Math.random() * moves.length)];
+      } else {
+        // Coup plus stratégique (profondeur 2)
+        selectedMove = findBestMove(game, 2);
+      }
+      break;
+      
     case AIDifficulty.HARD:
-      // Niveau avancé: profondeur 3
-      const [__, hardMove] = minimax(game, 3, -Infinity, Infinity, game.turn() === 'w');
-      return hardMove;
-    
+      // En mode difficile, jouer de manière plus cohérente
+      selectedMove = findBestMove(game, 3);
+      break;
+      
     case AIDifficulty.EXPERT:
-      // Niveau expert: profondeur 4
-      const [___, expertMove] = minimax(game, 4, -Infinity, Infinity, game.turn() === 'w');
-      return expertMove;
-    
+      // En mode expert, utiliser une profondeur plus grande
+      selectedMove = findBestMove(game, 4);
+      break;
+      
     default:
-      // Par défaut, niveau intermédiaire
-      return moves[Math.floor(Math.random() * moves.length)];
+      selectedMove = moves[Math.floor(Math.random() * moves.length)];
   }
+  
+  return selectedMove.san;
+};
+
+// Trouver le meilleur coup avec Minimax
+const findBestMove = (game: ChessGame, depth: number) => {
+  const isMaximizing = game.turn() === 'w';
+  const moves = game.moves({ verbose: true });
+  let bestMove = null;
+  let bestValue = isMaximizing ? -Infinity : Infinity;
+  
+  // Ajouter un peu d'aléatoire pour ne pas toujours jouer le même coup
+  const randomFactor = 0.1;
+  
+  for (const move of moves) {
+    game.move(move);
+    const value = minimax(game, depth - 1, -Infinity, Infinity, !isMaximizing) + 
+                  (Math.random() * 2 - 1) * randomFactor; // Petit facteur aléatoire
+    game.undo();
+    
+    if (isMaximizing && value > bestValue) {
+      bestValue = value;
+      bestMove = move;
+    } else if (!isMaximizing && value < bestValue) {
+      bestValue = value;
+      bestMove = move;
+    }
+  }
+  
+  return bestMove || moves[Math.floor(Math.random() * moves.length)];
 };
