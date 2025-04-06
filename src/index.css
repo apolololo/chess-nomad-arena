@@ -1,13 +1,11 @@
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
-  background-color: black;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  @apply bg-gray-50;
+}
+
+.chess-board {
+  @apply shadow-lg rounded-lg overflow-hidden;
 }
