@@ -15,17 +15,17 @@ export type ChessSoundType =
   | 'illegal'   // Coup illégal
   | 'notify';   // Notification
 
-// Chemins des fichiers audio
+// Chemins des fichiers audio (avec le bon chemin cette fois)
 const soundPaths: Record<ChessSoundType, string> = {
-  move: '/sounds/move.mp3',
-  capture: '/sounds/capture.mp3',
-  check: '/sounds/check.mp3',
-  castle: '/sounds/castle.mp3',
-  promote: '/sounds/promote.mp3',
-  checkmate: '/sounds/checkmate.mp3',
-  draw: '/sounds/draw.mp3',
-  illegal: '/sounds/illegal.mp3',
-  notify: '/sounds/notify.mp3'
+  move: '/assets/sounds/move.mp3',
+  capture: '/assets/sounds/capture.mp3',
+  check: '/assets/sounds/check.mp3',
+  castle: '/assets/sounds/castle.mp3',
+  promote: '/assets/sounds/promote.mp3',
+  checkmate: '/assets/sounds/checkmate.mp3',
+  draw: '/assets/sounds/draw.mp3',
+  illegal: '/assets/sounds/illegal.mp3',
+  notify: '/assets/sounds/notify.mp3'
 };
 
 // Activer/désactiver les sons
@@ -38,76 +38,56 @@ export const preloadSounds = async (): Promise<void> => {
   try {
     console.log("Préchargement des sons...");
     
-    // Création de fichiers audio fictifs si dans un environnement de test
+    // Vérifier si Audio API est disponible
     if (typeof Audio === 'undefined') {
       console.warn("Audio API non disponible dans cet environnement");
       return;
     }
     
-    const audioPromises = Object.entries(soundPaths).map(([key, path]) => {
-      return new Promise<void>((resolve) => {
-        try {
-          const audio = new Audio();
-          audio.preload = 'auto';
-          
-          // Gérer les erreurs de chargement silencieusement
-          audio.addEventListener('error', () => {
-            console.warn(`Impossible de charger le son ${key} depuis ${path}`);
-            resolve();
-          });
-          
-          // Considérer le son comme chargé dès qu'il peut jouer
-          audio.addEventListener('canplaythrough', () => {
-            console.log(`Son préchargé: ${key}`);
-            resolve();
-          }, { once: true });
-          
-          // Assurer la résolution même si les événements ne se déclenchent pas
-          setTimeout(resolve, 3000);
-          
-          audio.src = path;
-          audioCache[key] = audio;
-        } catch (err) {
-          console.error(`Erreur lors du préchargement du son ${key}:`, err);
-          resolve();
-        }
-      });
+    // Précharger chaque son
+    Object.entries(soundPaths).forEach(([key, path]) => {
+      try {
+        const audio = new Audio(path);
+        audio.preload = 'auto';
+        audio.volume = 0.7;
+        audioCache[key as ChessSoundType] = audio;
+        
+        // Log seulement en cas d'erreur
+        audio.addEventListener('error', () => {
+          console.error(`Erreur de chargement du son ${key} depuis ${path}`);
+        });
+      } catch (err) {
+        console.error(`Erreur lors du préchargement du son ${key}:`, err);
+      }
     });
     
-    // Attendre que tous les sons soient chargés (ou timeout)
-    await Promise.all(audioPromises);
-    console.log("Préchargement des sons terminé");
+    console.log("Sons préchargés");
   } catch (err) {
     console.error("Erreur lors du préchargement des sons:", err);
   }
 };
 
-// Jouer un son avec un système de fallback
+// Jouer un son
 export const playSound = (type: ChessSoundType): void => {
   if (!soundsEnabled) return;
   
   try {
-    console.log(`Jouer le son: ${type}`);
+    // Utiliser le son du cache s'il existe
+    if (audioCache[type]) {
+      const sound = audioCache[type].cloneNode() as HTMLAudioElement;
+      sound.volume = 0.7;
+      sound.play().catch(err => {
+        console.warn(`Impossible de jouer le son ${type}:`, err);
+      });
+      return;
+    }
     
-    // Créer un nouvel élément audio à chaque fois pour éviter les problèmes
-    // de lecture simultanée ou d'état de lecture
+    // Sinon, créer un nouveau son
     const sound = new Audio(soundPaths[type]);
     sound.volume = 0.7;
-    
-    // Utiliser une promesse pour gérer la lecture
-    sound.play()
-      .then(() => {
-        // Lecture réussie
-      })
-      .catch(err => {
-        // Fallback en cas d'échec - souvent causé par des restrictions du navigateur
-        console.warn(`Impossible de jouer le son ${type} automatiquement:`, err);
-        
-        // Ajouter au cache pour les tentatives futures
-        if (!audioCache[type]) {
-          audioCache[type] = sound;
-        }
-      });
+    sound.play().catch(err => {
+      console.warn(`Impossible de jouer le son ${type}:`, err);
+    });
   } catch (err) {
     console.error(`Erreur lors de la lecture du son ${type}:`, err);
   }

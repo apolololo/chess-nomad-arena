@@ -81,33 +81,33 @@ const GameControls: React.FC<GameControlsProps> = ({
   };
 
   return (
-    <div className="game-controls">
-      <Button variant="secondary" size="sm" onClick={onBackToMenu} className="hover:bg-secondary/60">
+    <div className="game-controls flex flex-wrap gap-2 p-3 bg-background/90 backdrop-blur-sm rounded-lg shadow-md">
+      <Button variant="secondary" size="sm" onClick={onBackToMenu} className="hover:bg-primary/20 transition-colors">
         <Home className="mr-1 h-4 w-4" />
         Accueil
       </Button>
       
-      <Button variant="secondary" size="sm" onClick={onFlipBoard} className="hover:bg-secondary/60">
+      <Button variant="secondary" size="sm" onClick={onFlipBoard} className="hover:bg-primary/20 transition-colors">
         <ArrowLeftRight className="mr-1 h-4 w-4" />
         Retourner
       </Button>
       
       {onNewGame && (
-        <Button variant="secondary" size="sm" onClick={onNewGame} className="hover:bg-secondary/60">
+        <Button variant="secondary" size="sm" onClick={onNewGame} className="hover:bg-primary/20 transition-colors">
           <RotateCcw className="mr-1 h-4 w-4" />
           Nouvelle partie
         </Button>
       )}
       
       {onResign && (
-        <Button variant="secondary" size="sm" onClick={onResign} className="hover:bg-secondary/60">
+        <Button variant="secondary" size="sm" onClick={onResign} className="hover:bg-primary/20 transition-colors">
           <Flag className="mr-1 h-4 w-4" />
           Abandonner
         </Button>
       )}
       
       {onOfferDraw && (
-        <Button variant="secondary" size="sm" onClick={onOfferDraw} className="hover:bg-secondary/60">
+        <Button variant="secondary" size="sm" onClick={onOfferDraw} className="hover:bg-primary/20 transition-colors">
           <Handshake className="mr-1 h-4 w-4" />
           Proposer nulle
         </Button>
@@ -117,7 +117,7 @@ const GameControls: React.FC<GameControlsProps> = ({
         variant="secondary" 
         size="sm" 
         onClick={handleToggleSound}
-        className="hover:bg-secondary/60"
+        className="hover:bg-primary/20 transition-colors"
       >
         {soundEnabled ? (
           <Volume2 className="mr-1 h-4 w-4" />
@@ -128,21 +128,21 @@ const GameControls: React.FC<GameControlsProps> = ({
       </Button>
       
       {onOpenSettings && (
-        <Button variant="secondary" size="sm" onClick={onOpenSettings} className="hover:bg-secondary/60">
+        <Button variant="secondary" size="sm" onClick={onOpenSettings} className="hover:bg-primary/20 transition-colors">
           <Settings className="mr-1 h-4 w-4" />
           Options
         </Button>
       )}
       
       {onOpenHelp && (
-        <Button variant="secondary" size="sm" onClick={onOpenHelp} className="hover:bg-secondary/60">
+        <Button variant="secondary" size="sm" onClick={onOpenHelp} className="hover:bg-primary/20 transition-colors">
           <HelpCircle className="mr-1 h-4 w-4" />
           Aide
         </Button>
       )}
       
       {showShare && gameId && (
-        <Button variant="default" size="sm" onClick={handleCopyGameLink}>
+        <Button variant="default" size="sm" onClick={handleCopyGameLink} className="bg-primary hover:bg-primary/90 transition-colors">
           <Share2 className="mr-1 h-4 w-4" />
           Inviter un ami
         </Button>

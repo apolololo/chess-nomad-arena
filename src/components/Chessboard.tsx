@@ -50,6 +50,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
   const handleDragStart = (e: React.MouseEvent, square: ChessSquare) => {
     if (disabled) return;
     
+    e.preventDefault(); // Empêcher les comportements par défaut
+    
     const piece = game.get(square);
     if (!piece || piece.color !== game.turn()) {
       playSound('illegal');
@@ -125,6 +127,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
   // Gérer le mouvement pendant le glisser-déposer avec la souris
   const handleDragMove = (e: MouseEvent) => {
     if (!draggedPiece || !boardRef.current) return;
+    
+    e.preventDefault(); // Empêcher les comportements par défaut
     
     const boardRect = boardRef.current.getBoundingClientRect();
     const offsetX = e.clientX - boardRect.left;
@@ -356,28 +360,35 @@ const Chessboard: React.FC<ChessboardProps> = ({
               </div>
             )}
             
+            {/* Surbrillance des derniers coups */}
             {(isLastMoveFrom || isLastMoveTo) && highlightLastMove && (
               <div className="absolute inset-0 bg-blue-400 bg-opacity-30 z-10" />
             )}
             
+            {/* Surbrillance de la sélection */}
             {isSelected && (
               <div className="absolute inset-0 bg-yellow-400 bg-opacity-40 z-10" />
             )}
             
+            {/* Pièce d'échecs */}
             {piece && !isDragOrigin && (
-              <ChessPiece
-                type={`${piece.color}${piece.type.toUpperCase()}`}
-                position={square}
-                isFlipped={isFlipped}
-                onMouseDown={(e) => handleDragStart(e, square)}
-                onTouchStart={(e) => handleTouchStart(e, square)}
-              />
+              <div className="absolute inset-0">
+                <ChessPiece
+                  type={`${piece.color}${piece.type.toUpperCase()}`}
+                  position={square}
+                  isFlipped={isFlipped}
+                  onMouseDown={(e) => handleDragStart(e, square)}
+                  onTouchStart={(e) => handleTouchStart(e, square)}
+                />
+              </div>
             )}
             
+            {/* Indicateur de mouvement légal */}
             {isLegalMove && !piece && (
               <div className="absolute w-1/4 h-1/4 rounded-full bg-black bg-opacity-20 z-10 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2" />
             )}
             
+            {/* Indicateur de capture */}
             {isLegalMove && piece && (
               <div className="absolute inset-0 border-2 border-yellow-400 z-10" />
             )}
@@ -390,7 +401,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
 
   return (
     <div className="relative rounded-lg shadow-lg overflow-hidden touch-none" ref={boardRef}>
-      <div className="chessboard">
+      <div className="chessboard grid grid-cols-8 grid-rows-8 w-full aspect-square">
         {renderBoard()}
       </div>
       

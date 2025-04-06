@@ -39,21 +39,26 @@ const ChessPiece: React.FC<ChessPieceProps> = ({
     }
   };
 
+  // Important: s'assurer que la pièce occupe toute la case et gère correctement les événements
   return (
-    <img
-      src={getPieceImage()}
-      alt={`${color === 'w' ? 'White' : 'Black'} ${getPieceName(piece)}`}
-      className={`chess-piece ${isDragging ? 'opacity-80' : ''} transition-transform cursor-grab will-change-transform`}
+    <div 
+      className={`chess-piece-container absolute inset-0 flex items-center justify-center z-20 cursor-grab ${isDragging ? 'z-50' : ''}`}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
-      draggable={false}
-      style={{
-        transform: isDragging ? 'scale(1.1)' : 'scale(1)',
-        transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-        filter: isDragging ? 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' : 'none',
-        touchAction: 'none'
-      }}
-    />
+      style={{ touchAction: 'none' }}
+    >
+      <img
+        src={getPieceImage()}
+        alt={`${color === 'w' ? 'White' : 'Black'} ${getPieceName(piece)}`}
+        className={`chess-piece w-4/5 h-4/5 ${isDragging ? 'opacity-80' : ''} select-none`}
+        draggable={false}
+        style={{
+          transform: isDragging ? 'scale(1.1)' : 'scale(1)',
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+          filter: isDragging ? 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' : 'none',
+        }}
+      />
+    </div>
   );
 };
 
