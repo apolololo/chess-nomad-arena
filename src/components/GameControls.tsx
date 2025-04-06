@@ -5,20 +5,18 @@ import {
   RotateCcw, 
   Flag, 
   Handshake, 
-  ArrowLeftRight, 
   Share2,
   Home,
   Settings,
   Volume2,
   VolumeX,
-  HelpCircle,
-  ChevronLeft
+  HelpCircle
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { toggleSounds, playSound } from "@/lib/audio";
 
 type GameControlsProps = {
-  onFlipBoard: () => void;
+  onFlipBoard?: () => void; // Optional now
   onResign?: () => void;
   onOfferDraw?: () => void;
   onNewGame?: () => void;
@@ -85,11 +83,6 @@ const GameControls: React.FC<GameControlsProps> = ({
       <Button variant="secondary" size="sm" onClick={onBackToMenu} className="hover:bg-primary/20 transition-colors">
         <Home className="mr-1 h-4 w-4" />
         Accueil
-      </Button>
-      
-      <Button variant="secondary" size="sm" onClick={onFlipBoard} className="hover:bg-primary/20 transition-colors">
-        <ArrowLeftRight className="mr-1 h-4 w-4" />
-        Retourner
       </Button>
       
       {onNewGame && (

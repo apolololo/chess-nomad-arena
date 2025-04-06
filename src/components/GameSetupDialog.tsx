@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AIDifficulty, GameMode, TimeControl } from '@/lib/chess-utils';
 
@@ -51,8 +50,7 @@ const GameSetupDialog: React.FC<GameSetupProps> = ({ open, onClose, onStartGame 
   const [settings, setSettings] = useState<GameSettings>({
     aiDifficulty: AIDifficulty.MEDIUM,
     timeControl: { minutes: 5, increment: 0 },
-    playerColor: 'white',
-    startWithFlippedBoard: false
+    playerColor: 'white'
   });
 
   const handleTimeChange = (value: string) => {
@@ -151,15 +149,6 @@ const GameSetupDialog: React.FC<GameSetupProps> = ({ open, onClose, onStartGame 
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch 
-                id="flip-board" 
-                checked={settings.startWithFlippedBoard}
-                onCheckedChange={(checked) => setSettings({ ...settings, startWithFlippedBoard: checked })}
-              />
-              <Label htmlFor="flip-board">Retourner l'échiquier</Label>
             </div>
           </div>
         </Tabs>

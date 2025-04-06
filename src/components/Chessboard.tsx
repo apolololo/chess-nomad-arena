@@ -11,6 +11,7 @@ type ChessboardProps = {
   isFlipped?: boolean;
   disabled?: boolean;
   highlightLastMove?: boolean;
+  playerColor?: 'w' | 'b';
 };
 
 const Chessboard: React.FC<ChessboardProps> = ({ 
@@ -18,7 +19,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
   onMove, 
   isFlipped = false,
   disabled = false,
-  highlightLastMove = true
+  highlightLastMove = true,
+  playerColor = 'w'
 }) => {
   const [selectedSquare, setSelectedSquare] = useState<ChessSquare | null>(null);
   const [legalMoves, setLegalMoves] = useState<ChessSquare[]>([]);
@@ -26,21 +28,13 @@ const Chessboard: React.FC<ChessboardProps> = ({
   const [draggedPiece, setDraggedPiece] = useState<{ square: ChessSquare, position: { x: number, y: number } } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const touchMoveRef = useRef<boolean>(false);
-  const piecePositionRef = useRef<{ x: number, y: number } | null>(null);
-  const dragStartPositionRef = useRef<{ x: number, y: number } | null>(null);
+  
+  // Le joueur est toujours en bas, donc si le joueur est noir, on inverse l'échiquier
+  const shouldFlipBoard = playerColor === 'b';
   
   // Précharger les sons au montage du composant et quand l'URL change
   useEffect(() => {
     preloadSounds();
-    
-    // Test sound after preloading
-    setTimeout(() => {
-      try {
-        playSound('move');
-      } catch (e) {
-        console.error("Error playing test sound:", e);
-      }
-    }, 1000);
   }, []);
 
   // Mettre à jour le dernier coup joué
@@ -60,10 +54,10 @@ const Chessboard: React.FC<ChessboardProps> = ({
   // Nettoyer les événements de drag lors du démontage du composant
   useEffect(() => {
     return () => {
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleTouchMove, { passive: false } as EventListenerOptions);
+      window.removeEventListener('touchend', handleTouchEnd);
     };
   }, []);
 
@@ -79,7 +73,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
       return;
     }
     
-    // Calculer la position initiale
+    // Calculer la position initiale relative à l'échiquier
     const boardRect = boardRef.current?.getBoundingClientRect();
     if (!boardRect) return;
     
@@ -87,24 +81,14 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetX = e.clientX - boardRect.left;
     const offsetY = e.clientY - boardRect.top;
     
-    // Enregistrer la position de départ
-    dragStartPositionRef.current = { 
-      x: e.clientX - boardRect.left, 
-      y: e.clientY - boardRect.top 
-    };
-    
-    // Démarrer le glissement
-    const position = { 
-      x: offsetX - squareSize / 2, 
-      y: offsetY - squareSize / 2 
-    };
-    
+    // Démarrer le glissement avec une position initiale au centre de la pièce
     setDraggedPiece({
       square,
-      position
+      position: { 
+        x: offsetX - squareSize / 2, 
+        y: offsetY - squareSize / 2 
+      }
     });
-    
-    piecePositionRef.current = position;
     
     // Jouer un son de sélection
     playSound('move');
@@ -112,9 +96,9 @@ const Chessboard: React.FC<ChessboardProps> = ({
     // Définir les mouvements légaux pour cette pièce
     setLegalMoves(getLegalMoves(game, square));
     
-    // Ajouter les gestionnaires d'événements
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
+    // Ajouter les gestionnaires d'événements globaux
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
   };
 
   // Gérer le début du glisser-déposer avec le toucher
@@ -139,24 +123,14 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetX = touch.clientX - boardRect.left;
     const offsetY = touch.clientY - boardRect.top;
     
-    // Enregistrer la position de départ
-    dragStartPositionRef.current = { 
-      x: touch.clientX - boardRect.left, 
-      y: touch.clientY - boardRect.top 
-    };
-    
     // Démarrer le glissement
-    const position = { 
-      x: offsetX - squareSize / 2, 
-      y: offsetY - squareSize / 2 
-    };
-    
     setDraggedPiece({
       square,
-      position
+      position: { 
+        x: offsetX - squareSize / 2, 
+        y: offsetY - squareSize / 2 
+      }
     });
-    
-    piecePositionRef.current = position;
     
     // Jouer un son de sélection
     playSound('move');
@@ -164,9 +138,9 @@ const Chessboard: React.FC<ChessboardProps> = ({
     // Définir les mouvements légaux pour cette pièce
     setLegalMoves(getLegalMoves(game, square));
     
-    // Ajouter les gestionnaires d'événements
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd);
+    // Ajouter les gestionnaires d'événements globaux
+    window.addEventListener('touchmove', handleTouchMove, { passive: false } as EventListenerOptions);
+    window.addEventListener('touchend', handleTouchEnd);
   };
   
   // Gérer le mouvement pendant le glisser-déposer avec la souris
@@ -180,17 +154,16 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetY = e.clientY - boardRect.top;
     const squareSize = boardRect.width / 8;
     
-    const newPosition = { 
-      x: offsetX - squareSize / 2, 
-      y: offsetY - squareSize / 2 
-    };
-    
-    piecePositionRef.current = newPosition;
-    
-    // Mise à jour de la position
-    setDraggedPiece({
-      square: draggedPiece.square,
-      position: newPosition
+    // Mise à jour de la position en temps réel
+    setDraggedPiece(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        position: { 
+          x: offsetX - squareSize / 2, 
+          y: offsetY - squareSize / 2 
+        }
+      };
     });
   };
   
@@ -208,24 +181,23 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetY = touch.clientY - boardRect.top;
     const squareSize = boardRect.width / 8;
     
-    const newPosition = { 
-      x: offsetX - squareSize / 2, 
-      y: offsetY - squareSize / 2 
-    };
-    
-    piecePositionRef.current = newPosition;
-    
-    // Mise à jour de la position
-    setDraggedPiece({
-      square: draggedPiece.square,
-      position: newPosition
+    // Mise à jour de la position en temps réel
+    setDraggedPiece(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        position: { 
+          x: offsetX - squareSize / 2, 
+          y: offsetY - squareSize / 2 
+        }
+      };
     });
   };
   
   // Gérer la fin du glisser-déposer avec la souris
   const handleDragEnd = (e: MouseEvent) => {
-    document.removeEventListener('mousemove', handleDragMove);
-    document.removeEventListener('mouseup', handleDragEnd);
+    window.removeEventListener('mousemove', handleDragMove);
+    window.removeEventListener('mouseup', handleDragEnd);
     
     if (!draggedPiece || !boardRef.current) {
       setDraggedPiece(null);
@@ -240,8 +212,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
     
     // Ajuster pour l'échiquier inversé
-    const displayFiles = isFlipped ? [...files].reverse() : files;
-    const displayRanks = isFlipped ? [...ranks].reverse() : ranks;
+    const displayFiles = shouldFlipBoard ? [...files].reverse() : files;
+    const displayRanks = shouldFlipBoard ? [...ranks].reverse() : ranks;
     
     const x = e.clientX - boardRect.left;
     const y = e.clientY - boardRect.top;
@@ -276,8 +248,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
   
   // Gérer la fin du glisser-déposer avec le toucher
   const handleTouchEnd = (e: TouchEvent) => {
-    document.removeEventListener('touchmove', handleTouchMove);
-    document.removeEventListener('touchend', handleTouchEnd);
+    window.removeEventListener('touchmove', handleTouchMove, { passive: false } as EventListenerOptions);
+    window.removeEventListener('touchend', handleTouchEnd);
     
     // Si c'était juste un tap (pas un mouvement), traiter comme un clic
     if (!touchMoveRef.current) {
@@ -302,8 +274,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
     
     // Ajuster pour l'échiquier inversé
-    const displayFiles = isFlipped ? [...files].reverse() : files;
-    const displayRanks = isFlipped ? [...ranks].reverse() : ranks;
+    const displayFiles = shouldFlipBoard ? [...files].reverse() : files;
+    const displayRanks = shouldFlipBoard ? [...ranks].reverse() : ranks;
     
     const touch = e.changedTouches[0];
     const x = touch.clientX - boardRect.left;
@@ -388,9 +360,9 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
     const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
 
-    // Si l'échiquier est retourné, inverser les rangs et les colonnes
-    const displayFiles = isFlipped ? [...files].reverse() : files;
-    const displayRanks = isFlipped ? [...ranks].reverse() : ranks;
+    // Ajuster pour l'échiquier inversé - le joueur noir est toujours en bas
+    const displayFiles = shouldFlipBoard ? [...files].reverse() : files;
+    const displayRanks = shouldFlipBoard ? [...ranks].reverse() : ranks;
 
     for (let rankIndex = 0; rankIndex < 8; rankIndex++) {
       for (let fileIndex = 0; fileIndex < 8; fileIndex++) {
@@ -436,7 +408,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
                 <ChessPiece
                   type={`${piece.color}${piece.type.toUpperCase()}`}
                   position={square}
-                  isFlipped={isFlipped}
+                  isFlipped={shouldFlipBoard}
                   onMouseDown={(e) => handleDragStart(e, square)}
                   onTouchStart={(e) => handleTouchStart(e, square)}
                 />
@@ -482,7 +454,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
             type={`${game.get(draggedPiece.square)?.color}${game.get(draggedPiece.square)?.type.toUpperCase()}`}
             position={draggedPiece.square}
             isDragging
-            isFlipped={isFlipped}
+            isFlipped={shouldFlipBoard}
           />
         </div>
       )}

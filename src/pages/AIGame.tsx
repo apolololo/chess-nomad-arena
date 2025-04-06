@@ -33,10 +33,6 @@ const AIGame = () => {
   };
 
   const [game, setGame] = useState<ChessGame>(new Chess());
-  const [isFlipped, setIsFlipped] = useState(
-    settings.startWithFlippedBoard || 
-    settings.playerColor === 'black'
-  );
   const [isGameOver, setIsGameOver] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [playerColor, setPlayerColor] = useState<ChessColor>(
@@ -203,7 +199,6 @@ const AIGame = () => {
     if (settings.playerColor === 'random') {
       const newColor = Math.random() < 0.5 ? 'w' : 'b';
       setPlayerColor(newColor);
-      setIsFlipped(settings.startWithFlippedBoard || newColor === 'b');
     }
     
     // Si le joueur est noir, l'IA (blancs) doit jouer en premier
@@ -243,8 +238,8 @@ const AIGame = () => {
                 <Chessboard 
                   game={game} 
                   onMove={handleMove} 
-                  isFlipped={isFlipped}
                   disabled={isGameOver || game.turn() !== playerColor || isThinking}
+                  playerColor={playerColor}
                 />
               </div>
               
@@ -256,7 +251,6 @@ const AIGame = () => {
               
               <div className="flex justify-center mt-4">
                 <GameControls 
-                  onFlipBoard={() => setIsFlipped(!isFlipped)}
                   onResign={() => {
                     setIsGameOver(true);
                     updateRating(Math.max(0, rating - 5));
