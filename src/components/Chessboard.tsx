@@ -26,10 +26,21 @@ const Chessboard: React.FC<ChessboardProps> = ({
   const [draggedPiece, setDraggedPiece] = useState<{ square: ChessSquare, position: { x: number, y: number } } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const touchMoveRef = useRef<boolean>(false);
+  const piecePositionRef = useRef<{ x: number, y: number } | null>(null);
+  const dragStartPositionRef = useRef<{ x: number, y: number } | null>(null);
   
-  // Précharger les sons au montage du composant
+  // Précharger les sons au montage du composant et quand l'URL change
   useEffect(() => {
     preloadSounds();
+    
+    // Test sound after preloading
+    setTimeout(() => {
+      try {
+        playSound('move');
+      } catch (e) {
+        console.error("Error playing test sound:", e);
+      }
+    }, 1000);
   }, []);
 
   // Mettre à jour le dernier coup joué
@@ -46,11 +57,21 @@ const Chessboard: React.FC<ChessboardProps> = ({
     }
   }, [game]);
 
+  // Nettoyer les événements de drag lors du démontage du composant
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, []);
+
   // Gérer le début du glisser-déposer avec la souris
   const handleDragStart = (e: React.MouseEvent, square: ChessSquare) => {
     if (disabled) return;
-    
     e.preventDefault(); // Empêcher les comportements par défaut
+    e.stopPropagation(); // Arrêter la propagation de l'événement
     
     const piece = game.get(square);
     if (!piece || piece.color !== game.turn()) {
@@ -66,11 +87,24 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetX = e.clientX - boardRect.left;
     const offsetY = e.clientY - boardRect.top;
     
+    // Enregistrer la position de départ
+    dragStartPositionRef.current = { 
+      x: e.clientX - boardRect.left, 
+      y: e.clientY - boardRect.top 
+    };
+    
     // Démarrer le glissement
+    const position = { 
+      x: offsetX - squareSize / 2, 
+      y: offsetY - squareSize / 2 
+    };
+    
     setDraggedPiece({
       square,
-      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
+      position
     });
+    
+    piecePositionRef.current = position;
     
     // Jouer un son de sélection
     playSound('move');
@@ -86,6 +120,7 @@ const Chessboard: React.FC<ChessboardProps> = ({
   // Gérer le début du glisser-déposer avec le toucher
   const handleTouchStart = (e: React.TouchEvent, square: ChessSquare) => {
     if (disabled) return;
+    e.preventDefault(); // Empêcher les comportements par défaut
     
     const piece = game.get(square);
     if (!piece || piece.color !== game.turn()) {
@@ -104,11 +139,24 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetX = touch.clientX - boardRect.left;
     const offsetY = touch.clientY - boardRect.top;
     
+    // Enregistrer la position de départ
+    dragStartPositionRef.current = { 
+      x: touch.clientX - boardRect.left, 
+      y: touch.clientY - boardRect.top 
+    };
+    
     // Démarrer le glissement
+    const position = { 
+      x: offsetX - squareSize / 2, 
+      y: offsetY - squareSize / 2 
+    };
+    
     setDraggedPiece({
       square,
-      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
+      position
     });
+    
+    piecePositionRef.current = position;
     
     // Jouer un son de sélection
     playSound('move');
@@ -119,9 +167,6 @@ const Chessboard: React.FC<ChessboardProps> = ({
     // Ajouter les gestionnaires d'événements
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
-    
-    // Empêcher le scroll et autres comportements par défaut
-    e.preventDefault();
   };
   
   // Gérer le mouvement pendant le glisser-déposer avec la souris
@@ -135,15 +180,25 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetY = e.clientY - boardRect.top;
     const squareSize = boardRect.width / 8;
     
+    const newPosition = { 
+      x: offsetX - squareSize / 2, 
+      y: offsetY - squareSize / 2 
+    };
+    
+    piecePositionRef.current = newPosition;
+    
+    // Mise à jour de la position
     setDraggedPiece({
-      ...draggedPiece,
-      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
+      square: draggedPiece.square,
+      position: newPosition
     });
   };
   
   // Gérer le mouvement pendant le glisser-déposer avec le toucher
   const handleTouchMove = (e: TouchEvent) => {
     if (!draggedPiece || !boardRef.current) return;
+    
+    e.preventDefault(); // Empêcher le scroll et autres comportements par défaut
     
     touchMoveRef.current = true;
     
@@ -153,13 +208,18 @@ const Chessboard: React.FC<ChessboardProps> = ({
     const offsetY = touch.clientY - boardRect.top;
     const squareSize = boardRect.width / 8;
     
-    setDraggedPiece({
-      ...draggedPiece,
-      position: { x: offsetX - squareSize / 2, y: offsetY - squareSize / 2 }
-    });
+    const newPosition = { 
+      x: offsetX - squareSize / 2, 
+      y: offsetY - squareSize / 2 
+    };
     
-    // Empêcher le scroll et autres comportements par défaut
-    e.preventDefault();
+    piecePositionRef.current = newPosition;
+    
+    // Mise à jour de la position
+    setDraggedPiece({
+      square: draggedPiece.square,
+      position: newPosition
+    });
   };
   
   // Gérer la fin du glisser-déposer avec la souris
@@ -414,6 +474,8 @@ const Chessboard: React.FC<ChessboardProps> = ({
             top: `${draggedPiece.position.y}px`,
             width: `${boardRef.current.offsetWidth / 8}px`,
             height: `${boardRef.current.offsetHeight / 8}px`,
+            willChange: 'transform',
+            transform: 'translate3d(0,0,0)'
           }}
         >
           <ChessPiece

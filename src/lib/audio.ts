@@ -15,7 +15,7 @@ export type ChessSoundType =
   | 'illegal'   // Coup illégal
   | 'notify';   // Notification
 
-// Chemins des fichiers audio (avec le bon chemin cette fois)
+// Chemins des fichiers audio avec le chemin corrigé
 const soundPaths: Record<ChessSoundType, string> = {
   move: '/assets/sounds/move.mp3',
   capture: '/assets/sounds/capture.mp3',
@@ -44,17 +44,34 @@ export const preloadSounds = async (): Promise<void> => {
       return;
     }
     
+    // Fallback sounds - use in-memory generated sounds
+    const createFallbackSound = () => {
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        return { audioContext, oscillator, gainNode };
+      } catch (e) {
+        console.warn("Couldn't create fallback audio:", e);
+        return null;
+      }
+    };
+    
     // Précharger chaque son
     Object.entries(soundPaths).forEach(([key, path]) => {
       try {
         const audio = new Audio(path);
         audio.preload = 'auto';
-        audio.volume = 0.7;
+        audio.volume = 0.5; // Volume légèrement réduit
         audioCache[key as ChessSoundType] = audio;
         
         // Log seulement en cas d'erreur
-        audio.addEventListener('error', () => {
-          console.error(`Erreur de chargement du son ${key} depuis ${path}`);
+        audio.addEventListener('error', (e) => {
+          console.error(`Erreur de chargement du son ${key} depuis ${path}:`, e);
         });
       } catch (err) {
         console.error(`Erreur lors du préchargement du son ${key}:`, err);
@@ -72,22 +89,48 @@ export const playSound = (type: ChessSoundType): void => {
   if (!soundsEnabled) return;
   
   try {
+    // Utiliser un simple bip si le son ne peut pas être chargé
+    const playFallbackSound = () => {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.type = 'sine';
+        
+        // Différentes fréquences selon le type de son
+        switch (type) {
+          case 'move': oscillator.frequency.value = 440; break;
+          case 'capture': oscillator.frequency.value = 300; break;
+          case 'check': oscillator.frequency.value = 550; break;
+          case 'illegal': oscillator.frequency.value = 220; break;
+          default: oscillator.frequency.value = 440; break;
+        }
+        
+        gainNode.gain.value = 0.1;
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.start();
+        setTimeout(() => oscillator.stop(), 150);
+      } catch (e) {
+        console.warn("Could not play fallback sound:", e);
+      }
+    };
+    
     // Utiliser le son du cache s'il existe
     if (audioCache[type]) {
       const sound = audioCache[type].cloneNode() as HTMLAudioElement;
-      sound.volume = 0.7;
+      sound.volume = 0.5;
       sound.play().catch(err => {
-        console.warn(`Impossible de jouer le son ${type}:`, err);
+        console.warn(`Impossible de jouer le son ${type}, utilisation d'un son de remplacement:`, err);
+        playFallbackSound();
       });
       return;
     }
     
-    // Sinon, créer un nouveau son
-    const sound = new Audio(soundPaths[type]);
-    sound.volume = 0.7;
-    sound.play().catch(err => {
-      console.warn(`Impossible de jouer le son ${type}:`, err);
-    });
+    // Utiliser le son de remplacement si le son n'est pas dans le cache
+    playFallbackSound();
   } catch (err) {
     console.error(`Erreur lors de la lecture du son ${type}:`, err);
   }

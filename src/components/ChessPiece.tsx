@@ -42,21 +42,26 @@ const ChessPiece: React.FC<ChessPieceProps> = ({
   // Important: s'assurer que la pièce occupe toute la case et gère correctement les événements
   return (
     <div 
-      className={`chess-piece-container absolute inset-0 flex items-center justify-center z-20 cursor-grab ${isDragging ? 'z-50' : ''}`}
+      className={`chess-piece-container absolute inset-0 flex items-center justify-center z-20 ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'}`}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
-      style={{ touchAction: 'none' }}
+      style={{ 
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none'
+      }}
     >
       <img
         src={getPieceImage()}
         alt={`${color === 'w' ? 'White' : 'Black'} ${getPieceName(piece)}`}
-        className={`chess-piece w-4/5 h-4/5 ${isDragging ? 'opacity-80' : ''} select-none`}
-        draggable={false}
+        className={`chess-piece w-4/5 h-4/5 pointer-events-auto select-none`}
         style={{
           transform: isDragging ? 'scale(1.1)' : 'scale(1)',
-          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+          opacity: isDragging ? 0.8 : 1,
           filter: isDragging ? 'drop-shadow(0 0 5px rgba(0,0,0,0.5))' : 'none',
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
         }}
+        draggable={false}
       />
     </div>
   );
