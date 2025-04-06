@@ -1,3 +1,4 @@
+
 export type GameMode = 'ai' | 'friend' | 'matchmaking';
 
 export type TimeControl = {
@@ -8,6 +9,7 @@ export type TimeControl = {
 export type GameSettings = {
   timeControl: TimeControl;
   rated: boolean;
+  aiLevel?: AILevel;
 };
 
 export type GameState = {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { ChessGame } from './components/ChessGame';
@@ -6,6 +7,7 @@ import { GameSettingsDialog } from './components/GameSettings';
 import { Copy, ChevronRight } from 'lucide-react';
 import type { GameMode, GameSettings, GameState, AILevel } from './lib/types';
 import { supabase } from './lib/supabase';
+import { toast, Toaster } from './components/ui/toast';
 
 function App() {
   const [gameId, setGameId] = useState<string | null>(null);
@@ -31,7 +33,10 @@ function App() {
     const initialState: GameState = {
       id: newGameId,
       mode: gameMode!,
-      settings,
+      settings: {
+        ...settings,
+        aiLevel: aiLevel || 3
+      },
       fen: 'start',
       pgn: '',
       status: gameMode === 'matchmaking' ? 'waiting' : 'playing',
@@ -41,6 +46,20 @@ function App() {
 
     if (gameMode === 'friend') {
       window.history.pushState({}, '', `?game=${newGameId}`);
+      
+      // For friend games, save the game state to Supabase
+      await supabase
+        .from('games')
+        .insert([initialState])
+        .then(({ error }) => {
+          if (error) console.error('Error creating game:', error);
+        });
+
+      // Notify user that the game has been created
+      toast({
+        title: "Partie créée",
+        description: "Partagez le lien avec un ami pour commencer à jouer",
+      });
     }
 
     setGameId(newGameId);
@@ -57,6 +76,11 @@ function App() {
           setPlayerColor(payload.color);
           setGameState(payload.gameState);
           setSearching(false);
+          
+          toast({
+            title: "Adversaire trouvé !",
+            description: "La partie commence maintenant",
+          });
         })
         .subscribe();
 
@@ -80,11 +104,57 @@ function App() {
 
     setGameState(updatedState);
 
-    if (gameMode === 'matchmaking') {
-      // Update ratings, save game history, etc.
+    if (gameMode === 'matchmaking' || gameMode === 'friend') {
+      // Update game history in Supabase
       await supabase
         .from('games')
-        .insert([updatedState]);
+        .update(updatedState)
+        .eq('id', gameId)
+        .then(({ error }) => {
+          if (error) console.error('Error updating game:', error);
+        });
+    }
+  };
+
+  const handleRematch = () => {
+    if (!gameState) return;
+    
+    // Swap colors for the rematch
+    const newPlayerColor = playerColor === 'white' ? 'black' : 'white';
+    setPlayerColor(newPlayerColor);
+    
+    // Create a new game with the same settings
+    const newGameId = nanoid();
+    const newGameState: GameState = {
+      id: newGameId,
+      mode: gameState.mode,
+      settings: gameState.settings,
+      fen: 'start',
+      pgn: '',
+      status: 'playing',
+      whiteTime: gameState.settings.timeControl.minutes * 60,
+      blackTime: gameState.settings.timeControl.minutes * 60,
+    };
+    
+    setGameId(newGameId);
+    setGameState(newGameState);
+    
+    if (gameState.mode === 'friend') {
+      // Update URL with new game ID
+      window.history.pushState({}, '', `?game=${newGameId}`);
+      
+      // Save new game to Supabase
+      supabase
+        .from('games')
+        .insert([newGameState])
+        .then(({ error }) => {
+          if (error) console.error('Error creating rematch game:', error);
+        });
+      
+      toast({
+        title: "Revanche créée",
+        description: "Partagez à nouveau le lien avec votre ami",
+      });
     }
   };
 
@@ -139,7 +209,13 @@ function App() {
               </div>
               {gameMode === 'friend' && (
                 <button
-                  onClick={() => navigator.clipboard.writeText(window.location.href)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast({
+                      title: "Lien copié !",
+                      description: "Vous pouvez maintenant le partager avec un ami",
+                    });
+                  }}
                   className="flex items-center space-x-2 bg-gray-100 px-4 py-2 rounded hover:bg-gray-200 transition-colors"
                 >
                   <Copy className="w-4 h-4" />
@@ -154,11 +230,13 @@ function App() {
                 playerColor={playerColor}
                 gameState={gameState}
                 onGameEnd={handleGameEnd}
+                onRematch={handleRematch}
               />
             </div>
           </div>
         ) : null}
       </main>
+      <Toaster />
     </div>
   );
 }
